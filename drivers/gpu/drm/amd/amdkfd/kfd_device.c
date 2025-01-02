@@ -676,6 +676,14 @@ static void kfd_cleanup_nodes(struct kfd_dev *kfd, unsigned int num_nodes)
 	struct kfd_node *knode;
 	unsigned int i;
 
+	/*
+	 * flush_work ensures that there are no outstanding
+	 * work-queue items that will access interrupt_ring. New work items
+	 * can't be created because we stopped interrupt handling above.
+	 */
+	flush_workqueue(kfd->ih_wq);
+	destroy_workqueue(kfd->ih_wq);
+
 	for (i = 0; i < num_nodes; i++) {
 		knode = kfd->nodes[i];
 		device_queue_manager_uninit(knode->dqm);
@@ -931,6 +939,9 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	svm_range_set_max_pages(kfd->adev);
 
+	kfd->profiler_process = NULL;
+	mutex_init(&kfd->profiler_lock);
+
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,
 		 kfd->adev->pdev->device);
@@ -966,6 +977,7 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 		ida_destroy(&kfd->doorbell_ida);
 		kfd_gtt_sa_fini(kfd);
 		amdgpu_amdkfd_free_gtt_mem(kfd->adev, &kfd->gtt_mem);
+		mutex_destroy(&kfd->profiler_lock);
 	}
 
 	kfree(kfd);
@@ -1094,32 +1106,6 @@ static int kfd_resume(struct kfd_node *node)
 	return err;
 }
 
-static inline void kfd_queue_work(struct workqueue_struct *wq,
-				  struct work_struct *work)
-{
-	int cpu, new_cpu;
-	const struct cpumask *mask = NULL;
-
-	cpu = new_cpu = smp_processor_id();
-
-#if defined(CONFIG_SCHED_SMT)
-	/* CPU threads in the same core */
-	mask = cpu_smt_mask(cpu);
-#endif
-	if (!mask || cpumask_weight(mask) <= 1)
-		/* CPU threads in the same NUMA node */
-		mask = cpu_cpu_mask(cpu);
-	/* Pick the next online CPU thread in the same core or NUMA node */
-	for_each_cpu_wrap(cpu, mask, cpu+1) {
-		if (cpu != new_cpu && cpu_online(cpu)) {
-			new_cpu = cpu;
-			break;
-		}
-	}
-
-	queue_work_on(new_cpu, wq, work);
-}
-
 /* This is called directly from KGD at ISR. */
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 {
@@ -1145,7 +1131,7 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 			    	patched_ihre, &is_patched)
 		    && enqueue_ih_ring_entry(node,
 			    	is_patched ? patched_ihre : ih_ring_entry)) {
-			kfd_queue_work(node->ih_wq, &node->interrupt_work);
+			queue_work(node->kfd->ih_wq, &node->interrupt_work);
 			spin_unlock_irqrestore(&node->interrupt_lock, flags);
 			return;
 		}
@@ -1558,6 +1544,73 @@ bool kgd2kfd_compute_active(struct kfd_dev *kfd, uint32_t node_id)
 	node = kfd->nodes[node_id];
 
 	return kfd_compute_active(node);
+}
+
+/**
+ * kgd2kfd_vmfault_fast_path() - KFD vm page fault interrupt handling fast path for gmc v9
+ * @adev: amdgpu device
+ * @entry: vm fault interrupt vector
+ * @retry_fault: if this is retry fault
+ *
+ * retry fault -
+ *    with CAM enabled, adev primary ring
+ *                           |  gmc_v9_0_process_interrupt()
+ *                      adev soft_ring
+ *                           |  gmc_v9_0_process_interrupt() worker failed to recover page fault
+ *                      KFD node ih_fifo
+ *                           |  KFD interrupt_wq worker
+ *                      kfd_signal_vm_fault_event
+ *
+ *    without CAM,      adev primary ring1
+ *                           |  gmc_v9_0_process_interrupt worker failed to recvoer page fault
+ *                      KFD node ih_fifo
+ *                           |  KFD interrupt_wq worker
+ *                      kfd_signal_vm_fault_event
+ *
+ * no-retry fault -
+ *                      adev primary ring
+ *                           |  gmc_v9_0_process_interrupt()
+ *                      KFD node ih_fifo
+ *                           |  KFD interrupt_wq worker
+ *                      kfd_signal_vm_fault_event
+ *
+ * fast path - After kfd_signal_vm_fault_event, gmc_v9_0_process_interrupt drop the page fault
+ *            of same process, don't copy interrupt to KFD node ih_fifo.
+ *            With gdb debugger enabled, need convert the retry fault to no-retry fault for
+ *            debugger, cannot use the fast path.
+ *
+ * Return:
+ *   true - use the fast path to handle this fault
+ *   false - use normal path to handle it
+ */
+bool kgd2kfd_vmfault_fast_path(struct amdgpu_device *adev, struct amdgpu_iv_entry *entry,
+			       bool retry_fault)
+{
+	struct kfd_process *p;
+	u32 cam_index;
+
+	if (entry->ih == &adev->irq.ih_soft || entry->ih == &adev->irq.ih1) {
+		p = kfd_lookup_process_by_pasid(entry->pasid);
+		if (!p)
+			return true;
+
+		if (p->gpu_page_fault && !p->debug_trap_enabled) {
+			if (retry_fault && adev->irq.retry_cam_enabled) {
+				cam_index = entry->src_data[2] & 0x3ff;
+				WDOORBELL32(adev->irq.retry_cam_doorbell_index, cam_index);
+			}
+
+			kfd_unref_process(p);
+			return true;
+		}
+
+		/*
+		 * This is the first page fault, set flag and then signal user space
+		 */
+		p->gpu_page_fault = true;
+		kfd_unref_process(p);
+	}
+	return false;
 }
 
 #if defined(CONFIG_DEBUG_FS)

@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/capability.h>
 #include <linux/device.h>
 #include <linux/export.h>
 #include <linux/err.h>
@@ -3359,6 +3360,86 @@ out:
 	return r;
 }
 
+static inline uint32_t profile_lock_device(struct kfd_process *p,
+					   uint32_t gpu_id, uint32_t op)
+{
+	struct kfd_process_device *pdd;
+	struct kfd_dev *kfd;
+	int status = -EINVAL;
+
+	if (!p)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, gpu_id);
+	mutex_unlock(&p->mutex);
+
+	if (!pdd || !pdd->dev || !pdd->dev->kfd)
+		return -EINVAL;
+
+	kfd = pdd->dev->kfd;
+
+	mutex_lock(&kfd->profiler_lock);
+	if (op == 1) {
+		if (!kfd->profiler_process) {
+			kfd->profiler_process = p;
+			status = 0;
+		} else if (kfd->profiler_process == p) {
+			status = -EALREADY;
+		} else {
+			status = -EBUSY;
+		}
+	} else if (op == 0 && kfd->profiler_process == p) {
+		kfd->profiler_process = NULL;
+		status = 0;
+	}
+	mutex_unlock(&kfd->profiler_lock);
+
+	return status;
+}
+
+static inline int kfd_profiler_pmc(struct kfd_process *p,
+				   struct kfd_ioctl_pmc_settings *args)
+{
+	struct kfd_process_device *pdd;
+	struct device_queue_manager *dqm;
+	int status;
+
+	/* Check if we have the correct permissions. */
+	if (!perfmon_capable())
+		return -EPERM;
+
+	/* Lock/Unlock the device based on the parameter given in OP */
+	status = profile_lock_device(p, args->gpu_id, args->lock);
+	if (status != 0)
+		return status;
+
+	/* Enable/disable perfcount if requested */
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+	dqm = pdd->dev->dqm;
+	mutex_unlock(&p->mutex);
+
+	dqm->ops.set_perfcount(dqm, args->perfcount_enable);
+	return status;
+}
+
+static int kfd_ioctl_profiler(struct file *filep, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_profiler_args *args = data;
+
+	switch (args->op) {
+	case KFD_IOC_PROFILER_VERSION:
+		args->version = KFD_IOC_PROFILER_VERSION_NUM;
+		return 0;
+	case KFD_IOC_PROFILER_PC_SAMPLE:
+		return kfd_ioctl_pc_sample(filep, p, &args->pc_sample);
+	case KFD_IOC_PROFILER_PMC:
+		return kfd_profiler_pmc(p, &args->pmc);
+	}
+	return -EINVAL;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .cmd_drv = 0, .name = #ioctl}
@@ -3496,6 +3577,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	/* TODO: KFD_IOC_FLAG_PERFMON is not required for host-trap, disable first */
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_PC_SAMPLE,
 			kfd_ioctl_pc_sample, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_PROFILER,
+			kfd_ioctl_profiler, 0),
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)

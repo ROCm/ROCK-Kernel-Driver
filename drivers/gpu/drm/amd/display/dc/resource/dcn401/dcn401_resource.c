@@ -737,7 +737,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 			.enable_stall_recovery = true,
 		}
 	},
-	.force_cositing = CHROMA_COSITING_TOPLEFT + 1,
+	.force_cositing = CHROMA_COSITING_NONE + 1,
 };
 
 static struct dce_aux *dcn401_aux_engine_create(
@@ -1609,6 +1609,7 @@ static void dcn401_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *b
 
 enum dc_status dcn401_patch_unknown_plane_state(struct dc_plane_state *plane_state)
 {
+	plane_state->tiling_info.gfxversion = DcGfxAddr3;
 	plane_state->tiling_info.gfx_addr3.swizzle = DC_ADDR3_SW_64KB_2D;
 	return DC_OK;
 }

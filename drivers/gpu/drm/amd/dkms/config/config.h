@@ -488,6 +488,9 @@
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
 
+/* Define to 1 if you have the <drm/drm_panic.h> header file. */
+#define HAVE_DRM_DRM_PANIC_H 1
+
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
@@ -541,9 +544,6 @@
 
 /* drm_firmware_drivers_only() is available */
 #define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
-
-/* drm_format_info.block_w and rm_format_info.block_h is available */
-#define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
@@ -754,6 +754,9 @@
 
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
+
+/* kfifo_out_linear() available */
+#define HAVE_KFIFO_OUT_LINEAR 1
 
 /* kfifo_put() have non pointer parameter */
 #define HAVE_KFIFO_PUT_NON_POINTER 1
@@ -1049,6 +1052,9 @@
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
+
+/* struct drm_plane_helper_funcs->get_scanout_buffer is available */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER 1
 
 /* ide->idr_base is available */
 #define HAVE_STRUCT_IDE_IDR_BASE 1

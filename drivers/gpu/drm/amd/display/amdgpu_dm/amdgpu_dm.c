@@ -2187,6 +2187,10 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	amdgpu_dm_crtc_secure_display_create_contexts(adev);
 	if (!adev->dm.secure_display_ctx.crtc_ctx)
 		DRM_ERROR("amdgpu: failed to initialize secure display contexts.\n");
+
+	if (amdgpu_ip_version(adev, DCE_HWIP, 0) >= IP_VERSION(4, 0, 1))
+		adev->dm.secure_display_ctx.support_mul_roi = true;
+
 #endif
 
 	DRM_DEBUG_DRIVER("KMS initialized.\n");
@@ -3475,9 +3479,7 @@ const struct amdgpu_ip_block_version dm_ip_block = {
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.get_format_info = amdgpu_dm_plane_get_format_info,
-#endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = drm_atomic_helper_commit,
 };
@@ -9271,6 +9273,7 @@ static void amdgpu_dm_enable_self_refresh(struct amdgpu_crtc *acrtc_attach,
 	struct replay_settings *pr = &acrtc_state->stream->link->replay_settings;
 	struct amdgpu_dm_connector *aconn =
 		(struct amdgpu_dm_connector *)acrtc_state->stream->dm_stream_context;
+	bool vrr_active = amdgpu_dm_crtc_vrr_active(acrtc_state);
 
 	if (acrtc_state->update_type > UPDATE_TYPE_FAST) {
 		if (pr->config.replay_supported && !pr->replay_feature_enabled)
@@ -9297,14 +9300,15 @@ static void amdgpu_dm_enable_self_refresh(struct amdgpu_crtc *acrtc_attach,
 		 * adequate number of fast atomic commits to notify KMD
 		 * of update events. See `vblank_control_worker()`.
 		 */
-		if (acrtc_attach->dm_irq_params.allow_sr_entry &&
+		if (!vrr_active &&
+		    acrtc_attach->dm_irq_params.allow_sr_entry &&
 #ifdef CONFIG_DRM_AMD_SECURE_DISPLAY
 		    !amdgpu_dm_crc_window_is_activated(acrtc_state->base.crtc) &&
 #endif
 		    (current_ts - psr->psr_dirty_rects_change_timestamp_ns) > 500000000) {
 			if (pr->replay_feature_enabled && !pr->replay_allow_active)
 				amdgpu_dm_replay_enable(acrtc_state->stream, true);
-			if (psr->psr_version >= DC_PSR_VERSION_SU_1 &&
+			if (psr->psr_version == DC_PSR_VERSION_SU_1 &&
 			    !psr->psr_allow_active && !aconn->disallow_edp_enter_psr)
 				amdgpu_dm_psr_enable(acrtc_state->stream);
 		}
@@ -9651,7 +9655,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			bundle->stream_update.abm_level = &acrtc_state->abm_level;
 
 		mutex_lock(&dm->dc_lock);
-		if (acrtc_state->update_type > UPDATE_TYPE_FAST) {
+		if ((acrtc_state->update_type > UPDATE_TYPE_FAST) || vrr_active) {
 			if (acrtc_state->stream->link->replay_settings.replay_allow_active)
 				amdgpu_dm_replay_disable(acrtc_state->stream);
 			if (acrtc_state->stream->link->psr_settings.psr_allow_active)
@@ -10434,14 +10438,19 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			if (amdgpu_dm_is_valid_crc_source(cur_crc_src)) {
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 				if (amdgpu_dm_crc_window_is_activated(crtc)) {
+					uint8_t cnt;
 					spin_lock_irqsave(&adev_to_drm(adev)->event_lock, flags);
-					acrtc->dm_irq_params.window_param.update_win = true;
+					for (cnt = 0; cnt < MAX_CRC_WINDOW_NUM; cnt++) {
+						if (acrtc->dm_irq_params.window_param[cnt].enable) {
+							acrtc->dm_irq_params.window_param[cnt].update_win = true;
 
-					/**
-					 * It takes 2 frames for HW to stably generate CRC when
-					 * resuming from suspend, so we set skip_frame_cnt 2.
-					 */
-					acrtc->dm_irq_params.window_param.skip_frame_cnt = 2;
+							/**
+							 * It takes 2 frames for HW to stably generate CRC when
+							 * resuming from suspend, so we set skip_frame_cnt 2.
+							 */
+							acrtc->dm_irq_params.window_param[cnt].skip_frame_cnt = 2;
+						}
+					}
 					spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
 				}
 #endif
@@ -11533,8 +11542,8 @@ dm_get_plane_scale(struct drm_plane_state *plane_state,
 	int plane_src_w, plane_src_h;
 
 	dm_get_oriented_plane_size(plane_state, &plane_src_w, &plane_src_h);
-	*out_plane_scale_w = plane_state->crtc_w * 1000 / plane_src_w;
-	*out_plane_scale_h = plane_state->crtc_h * 1000 / plane_src_h;
+	*out_plane_scale_w = plane_src_w ? plane_state->crtc_w * 1000 / plane_src_w : 0;
+	*out_plane_scale_h = plane_src_h ? plane_state->crtc_h * 1000 / plane_src_h : 0;
 }
 
 /*

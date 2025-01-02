@@ -337,6 +337,29 @@ static int remove_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 	return r;
 }
 
+static void set_perfcount(struct device_queue_manager *dqm, int enable)
+{
+	struct device_process_node *cur;
+	struct qcm_process_device *qpd;
+	struct queue *q;
+	struct mqd_update_info minfo = { 0 };
+
+	if (!dqm)
+		return;
+
+	minfo.update_flag = (enable == 1 ? UPDATE_FLAG_PERFCOUNT_ENABLE :
+						 UPDATE_FLAG_PERFCOUNT_DISABLE);
+	dqm_lock(dqm);
+	list_for_each_entry(cur, &dqm->queues, list) {
+		qpd = cur->qpd;
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			pqm_update_mqd(qpd->pqm, q->properties.queue_id,
+						&minfo);
+		}
+	}
+	dqm_unlock(dqm);
+}
+
 static int remove_all_kfd_queues_mes(struct device_queue_manager *dqm)
 {
 	struct device_process_node *cur;
@@ -2918,6 +2941,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_node *dev)
 		dqm->ops.reset_queues = reset_queues_cpsch;
 		dqm->ops.get_queue_checkpoint_info = get_queue_checkpoint_info;
 		dqm->ops.checkpoint_mqd = checkpoint_mqd;
+		dqm->ops.set_perfcount = set_perfcount;
 		break;
 	case KFD_SCHED_POLICY_NO_HWS:
 		/* initialize dqm for no cp scheduling */
@@ -2938,6 +2962,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_node *dev)
 		dqm->ops.get_wave_state = get_wave_state;
 		dqm->ops.get_queue_checkpoint_info = get_queue_checkpoint_info;
 		dqm->ops.checkpoint_mqd = checkpoint_mqd;
+		dqm->ops.set_perfcount = set_perfcount;
 		break;
 	default:
 		dev_err(dev->adev->dev, "Invalid scheduling policy %d\n", dqm->sched_policy);

@@ -33,6 +33,7 @@
 #include "soc15_common.h"
 #include "gc/gc_11_0_0_offset.h"
 #include "gc/gc_11_0_0_sh_mask.h"
+#include "bif/bif_4_1_d.h"
 #include <asm/div64.h>
 
 #include <linux/pci.h>
@@ -580,7 +581,6 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 	return domain;
 }
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static const struct drm_format_info dcc_formats[] = {
 	{ .format = DRM_FORMAT_XRGB8888, .depth = 24, .num_planes = 2,
 	  .cpp = { 4, 0, }, .block_w = {1, 1, 1}, .block_h = {1, 1, 1}, .hsub = 1, .vsub = 1, },
@@ -673,7 +673,6 @@ amdgpu_lookup_format_info(u32 format, uint64_t modifier)
 	/* returning NULL will cause the default format structs to be used. */
 	return NULL;
 }
-#endif
 
 /*
  * Tries to extract the renderable DCC offset from the opaque metadata attached
@@ -749,7 +748,6 @@ static int convert_tiling_flags_to_modifier_gfx12(struct amdgpu_framebuffer *afb
 	return 0;
 }
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 {
 	struct amdgpu_device *adev = drm_to_adev(afb->base.dev);
@@ -943,7 +941,6 @@ static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 	afb->base.flags |= DRM_MODE_FB_MODIFIERS;
 	return 0;
 }
-#endif
 
 /* Mirrors the is_displayable check in radeonsi's gfx6_compute_surface */
 static int check_tiling_flags_gfx6(struct amdgpu_framebuffer *afb)
@@ -966,7 +963,6 @@ static int check_tiling_flags_gfx6(struct amdgpu_framebuffer *afb)
 	}
 }
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static void get_block_dimensions(unsigned int block_log2, unsigned int cpp,
 				 unsigned int *width, unsigned int *height)
 {
@@ -1166,7 +1162,6 @@ static int amdgpu_display_verify_sizes(struct amdgpu_framebuffer *rfb)
 
 	return 0;
 }
-#endif
 
 static int amdgpu_display_get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 				      uint64_t *tiling_flags, bool *tmz_surface,
@@ -1236,7 +1231,6 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 	rfb->base.obj[0] = obj;
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	/* Verify that the modifier is supported. */
 	if (!drm_any_plane_has_format(dev, mode_cmd->pixel_format,
 				      mode_cmd->modifier[0])) {
@@ -1247,7 +1241,6 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 		ret = -EINVAL;
 		goto err;
 	}
-#endif
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
 	if (ret)
@@ -1281,7 +1274,6 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	 * This needs to happen before modifier conversion as that might change
 	 * the number of planes.
 	 */
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	for (i = 1; i < rfb->base.format->num_planes; ++i) {
 		if (mode_cmd->handles[i] != mode_cmd->handles[0]) {
 			drm_dbg_kms(dev, "Plane 0 and %d have different BOs: %u vs. %u\n",
@@ -1290,14 +1282,12 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 			return ret;
 		}
 	}
-#endif
 
 	ret = amdgpu_display_get_fb_info(rfb, &rfb->tiling_flags, &rfb->tmz_surface,
 					 &rfb->gfx12_dcc);
 	if (ret)
 		return ret;
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 #ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	if (dev->mode_config.fb_modifiers_not_supported && !adev->enable_virtual_display) {
 #else
@@ -1336,7 +1326,6 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 		drm_gem_object_get(rfb->base.obj[0]);
 		rfb->base.obj[i] = rfb->base.obj[0];
 	}
-#endif
 
 	return 0;
 }
@@ -1366,17 +1355,13 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	domains = amdgpu_display_supported_domains(drm_to_adev(dev), bo->flags);
 	if (obj->import_attach && !(domains & AMDGPU_GEM_DOMAIN_GTT)) {
 		drm_dbg_kms(dev, "Cannot create framebuffer from imported dma_buf\n");
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
-#endif
 		return ERR_PTR(-EINVAL);
 	}
 
 	amdgpu_fb = kzalloc(sizeof(*amdgpu_fb), GFP_KERNEL);
 	if (amdgpu_fb == NULL) {
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
-#endif
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -1384,15 +1369,11 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 						    mode_cmd, obj);
 	if (ret) {
 		kfree(amdgpu_fb);
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
-#endif
 		return ERR_PTR(ret);
 	}
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	drm_gem_object_put(obj);
-#endif
 
 	return &amdgpu_fb->base;
 }
@@ -1852,3 +1833,84 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 	return 0;
 }
 
+/* panic_bo is set in amdgpu_dm_plane_get_scanout_buffer() and only used in amdgpu_dm_set_pixel()
+ * they are called from the panic handler, and protected by the drm_panic spinlock.
+ */
+static struct amdgpu_bo *panic_abo;
+
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
+/* Use the indirect MMIO to write each pixel to the GPU VRAM,
+ * This is a simplified version of amdgpu_device_mm_access()
+ */
+static void amdgpu_display_set_pixel(struct drm_scanout_buffer *sb,
+				     unsigned int x,
+				     unsigned int y,
+				     u32 color)
+{
+	struct amdgpu_res_cursor cursor;
+	unsigned long offset;
+	struct amdgpu_bo *abo = panic_abo;
+	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
+	uint32_t tmp;
+
+	offset = x * 4 + y * sb->pitch[0];
+	amdgpu_res_first(abo->tbo.resource, offset, 4, &cursor);
+
+	tmp = cursor.start >> 31;
+	WREG32_NO_KIQ(mmMM_INDEX, ((uint32_t) cursor.start) | 0x80000000);
+	if (tmp != 0xffffffff)
+		WREG32_NO_KIQ(mmMM_INDEX_HI, tmp);
+	WREG32_NO_KIQ(mmMM_DATA, color);
+}
+
+int amdgpu_display_get_scanout_buffer(struct drm_plane *plane,
+				      struct drm_scanout_buffer *sb)
+{
+	struct amdgpu_bo *abo;
+	struct drm_framebuffer *fb = plane->state->fb;
+
+	if (!fb)
+		return -EINVAL;
+
+	DRM_DEBUG_KMS("Framebuffer %dx%d %p4cc\n", fb->width, fb->height, &fb->format->format);
+
+	abo = gem_to_amdgpu_bo(fb->obj[0]);
+	if (!abo)
+		return -EINVAL;
+
+	sb->width = fb->width;
+	sb->height = fb->height;
+	/* Use the generic linear format, because tiling will be disabled in panic_flush() */
+	sb->format = drm_format_info(fb->format->format);
+	if (!sb->format)
+		return -EINVAL;
+
+	sb->pitch[0] = fb->pitches[0];
+
+	if (abo->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS) {
+		if (abo->tbo.resource->mem_type != TTM_PL_VRAM) {
+			drm_warn(plane->dev, "amdgpu panic, framebuffer not in VRAM\n");
+			return -EINVAL;
+		}
+		/* Only handle 32bits format, to simplify mmio access */
+		if (fb->format->cpp[0] != 4) {
+			drm_warn(plane->dev, "amdgpu panic, pixel format is not 32bits\n");
+			return -EINVAL;
+		}
+		sb->set_pixel = amdgpu_display_set_pixel;
+		panic_abo = abo;
+		return 0;
+	}
+	if (!abo->kmap.virtual &&
+	    ttm_bo_kmap(&abo->tbo, 0, PFN_UP(abo->tbo.base.size), &abo->kmap)) {
+		drm_warn(plane->dev, "amdgpu bo map failed, panic won't be displayed\n");
+		return -ENOMEM;
+	}
+	if (abo->kmap.bo_kmap_type & TTM_BO_MAP_IOMEM_MASK)
+		iosys_map_set_vaddr_iomem(&sb->map[0], abo->kmap.virtual);
+	else
+		iosys_map_set_vaddr(&sb->map[0], abo->kmap.virtual);
+
+	return 0;
+}
+#endif

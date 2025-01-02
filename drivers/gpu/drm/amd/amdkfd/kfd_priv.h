@@ -322,7 +322,6 @@ struct kfd_node {
 
 	/* Interrupts */
 	struct kfifo ih_fifo;
-	struct workqueue_struct *ih_wq;
 	struct work_struct interrupt_work;
 	spinlock_t interrupt_lock;
 
@@ -421,11 +420,18 @@ struct kfd_dev {
 	struct kfd_node *nodes[MAX_KFD_NODES];
 	unsigned int num_nodes;
 
+	struct workqueue_struct *ih_wq;
+
 	/* Kernel doorbells for KFD device */
 	struct amdgpu_bo *doorbells;
 
 	/* bitmap for dynamic doorbell allocation from doorbell object */
 	unsigned long *doorbell_bitmap;
+
+	/* Lock for profiler process */
+	struct mutex profiler_lock;
+	/* Process currently holding the lock */
+	struct kfd_process *profiler_process;
 };
 
 struct kfd_ipc_obj;
@@ -609,6 +615,8 @@ enum mqd_update_flag {
 	UPDATE_FLAG_DBG_WA_ENABLE = 1,
 	UPDATE_FLAG_DBG_WA_DISABLE = 2,
 	UPDATE_FLAG_IS_GWS = 4, /* quirk for gfx9 IP */
+	UPDATE_FLAG_PERFCOUNT_ENABLE = 5,
+	UPDATE_FLAG_PERFCOUNT_DISABLE = 6,
 };
 
 struct mqd_update_info {
@@ -1111,6 +1119,9 @@ struct kfd_process {
 	struct semaphore runtime_enable_sema;
 	bool is_runtime_retry;
 	struct kfd_runtime_info runtime_info;
+
+	/* if gpu page fault sent to KFD */
+	bool gpu_page_fault;
 
 	/* Indicates process' PC Sampling ref cnt*/
 	uint32_t pc_sampling_ref;

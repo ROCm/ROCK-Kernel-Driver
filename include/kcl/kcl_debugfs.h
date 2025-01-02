@@ -19,8 +19,10 @@
 #include <linux/types.h>
 #include <linux/compiler.h>
 
-#if defined(DEFINE_DEBUGFS_ATTRIBUTE) && !defined(DEFINE_DEBUGFS_ATTRIBUTE_SIGNED)
-#define KCL_FAKE_DEBUGFS_ATTRIBUTE_SIGNED
+#if !defined(DEFINE_DEBUGFS_ATTRIBUTE_XSIGNED)
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
+#define KCL_FAKE_DEBUGFS_ATTRIBUTE_XSIGNED
 #define DEFINE_DEBUGFS_ATTRIBUTE_XSIGNED(__fops, __get, __set, __fmt, __is_signed)	\
 static int __fops ## _open(struct inode *inode, struct file *file)	\
 {									\
@@ -36,6 +38,10 @@ static const struct file_operations __fops = {				\
 	.llseek  = no_llseek,						\
 }
 
+#undef DEFINE_DEBUGFS_ATTRIBUTE
+#define DEFINE_DEBUGFS_ATTRIBUTE(__fops, __get, __set, __fmt)	\
+	DEFINE_DEBUGFS_ATTRIBUTE_XSIGNED(__fops, __get, __set, __fmt, false)
+
 #define DEFINE_DEBUGFS_ATTRIBUTE_SIGNED(__fops, __get, __set, __fmt)	\
 	DEFINE_DEBUGFS_ATTRIBUTE_XSIGNED(__fops, __get, __set, __fmt, true)
 
@@ -50,6 +56,18 @@ static inline ssize_t debugfs_attr_write_signed(struct file *file,
 	return -ENODEV;
 }
 #endif /* CONFIG_DEBUG_FS */
+
+#else
+#define DEFINE_DEBUGFS_ATTRIBUTE DEFINE_SIMPLE_ATTRIBUTE
+#define DEFINE_DEBUGFS_ATTRIBUTE_SIGNED DEFINE_SIMPLE_ATTRIBUTE
+static inline struct dentry *debugfs_create_file_unsafe(const char *name,
+					umode_t mode, struct dentry *parent,
+					void *data,
+					const struct file_operations *fops)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif  /* DEFINE_DEBUGFS_ATTRIBUTE */
 
 #endif /* DEFINE_DEBUGFS_ATTRIBUTE_SIGNED */
 

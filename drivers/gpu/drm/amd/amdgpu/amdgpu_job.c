@@ -102,8 +102,6 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 		return DRM_GPU_SCHED_STAT_ENODEV;
 	}
 
-	adev->job_hang = true;
-
 	/*
 	 * Do the coredump immediately after a job timeout to get a very
 	 * close dump/snapshot/representation of GPU's current error status
@@ -181,7 +179,6 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
 	}
 
 exit:
-	adev->job_hang = false;
 	drm_dev_exit(idx);
 	return DRM_GPU_SCHED_STAT_NOMINAL;
 }
@@ -361,6 +358,13 @@ amdgpu_job_prepare_job(struct drm_sched_job *sched_job,
 			dev_err(ring->adev->dev, "Error getting VM ID (%d)\n", r);
 			goto error;
 		}
+		/*
+		 * The VM structure might be released after the VMID is
+		 * assigned, we had multiple problems with people trying to use
+		 * the VM pointer so better set it to NULL.
+		 */
+		if (!fence)
+			job->vm = NULL;
 	}
 
 	return fence;

@@ -30,6 +30,11 @@
 
 #ifndef CAP_PERFMON
 #define CAP_PERFMON 38
+
+static inline bool perfmon_capable(void)
+{
+	return capable(CAP_PERFMON) || capable(CAP_SYS_ADMIN);
+}
 #endif
 
 #endif

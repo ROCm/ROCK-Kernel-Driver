@@ -96,7 +96,6 @@ MODULE_FIRMWARE("amdgpu/smu_13_0_14.bin");
 #define PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE_MASK 0xE0
 #define PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE__SHIFT 0x5
 #define LINK_SPEED_MAX				4
-
 #define SMU_13_0_6_DSCLK_THRESHOLD 140
 
 #define MCA_BANK_IPID(_ip, _hwid, _type) \
@@ -202,6 +201,7 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetPhsDetOnOff,                      PPSMC_MSG_SetPhsDetOnOff,                  0),
 	MSG_MAP(GetPhsDetResidency,                  PPSMC_MSG_GetPhsDetResidency,              0),
 	MSG_MAP(ResetSDMA,                           PPSMC_MSG_ResetSDMA,                       0),
+	MSG_MAP(ResetSDMA2,                          PPSMC_MSG_ResetSDMA2,                      0),
 };
 
 // clang-format on
@@ -379,7 +379,7 @@ static int smu_v13_0_6_tables_init(struct smu_context *smu)
 		return -ENOMEM;
 	smu_table->metrics_time = 0;
 
-	smu_table->gpu_metrics_table_size = sizeof(struct gpu_metrics_v1_6);
+	smu_table->gpu_metrics_table_size = sizeof(struct gpu_metrics_v1_7);
 	smu_table->gpu_metrics_table =
 		kzalloc(smu_table->gpu_metrics_table_size, GFP_KERNEL);
 	if (!smu_table->gpu_metrics_table) {
@@ -2481,8 +2481,8 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 {
 	bool per_inst, smu_13_0_6_per_inst, smu_13_0_14_per_inst, apu_per_inst;
 	struct smu_table_context *smu_table = &smu->smu_table;
-	struct gpu_metrics_v1_6 *gpu_metrics =
-		(struct gpu_metrics_v1_6 *)smu_table->gpu_metrics_table;
+	struct gpu_metrics_v1_7 *gpu_metrics =
+		(struct gpu_metrics_v1_7 *)smu_table->gpu_metrics_table;
 	bool flag = smu_v13_0_6_is_unified_metrics(smu);
 	int ret = 0, xcc_id, inst, i, j, k, idx;
 	struct amdgpu_device *adev = smu->adev;
@@ -2501,7 +2501,7 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 
 	metrics_a = (MetricsTableA_t *)metrics_x;
 
-	smu_cmn_init_soft_gpu_metrics(gpu_metrics, 1, 6);
+	smu_cmn_init_soft_gpu_metrics(gpu_metrics, 1, 7);
 
 	gpu_metrics->temperature_hotspot =
 		SMUQ10_ROUND(GET_METRIC_FIELD(MaxSocketTemperature, flag));
@@ -2608,6 +2608,9 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 			SMUQ10_ROUND(GET_METRIC_FIELD(XgmiReadDataSizeAcc, flag)[i]);
 		gpu_metrics->xgmi_write_data_acc[i] =
 			SMUQ10_ROUND(GET_METRIC_FIELD(XgmiWriteDataSizeAcc, flag)[i]);
+		ret = amdgpu_get_xgmi_link_status(adev, i);
+		if (ret >= 0)
+			gpu_metrics->xgmi_link_status[i] = ret;
 	}
 
 	gpu_metrics->num_partition = adev->xcp_mgr->num_xcps;
@@ -2893,17 +2896,31 @@ static int smu_v13_0_6_post_init(struct smu_context *smu)
 
 static int smu_v13_0_6_reset_sdma(struct smu_context *smu, uint32_t inst_mask)
 {
-	struct amdgpu_device *adev = smu->adev;
+	uint32_t smu_program;
 	int ret = 0;
 
-	/* the message is only valid on SMU 13.0.6 with pmfw 85.121.00 and above */
-	if ((adev->flags & AMD_IS_APU) ||
-	    amdgpu_ip_version(adev, MP1_HWIP, 0) != IP_VERSION(13, 0, 6) ||
-	    smu->smc_fw_version < 0x00557900)
-		return 0;
+	smu_program = (smu->smc_fw_version >> 24) & 0xff;
+	switch (amdgpu_ip_version(smu->adev, MP1_HWIP, 0)) {
+	case IP_VERSION(13, 0, 6):
+		if (((smu_program == 7) && (smu->smc_fw_version > 0x07550700)) ||
+			((smu_program == 0) && (smu->smc_fw_version > 0x00557700)))
+			ret = smu_cmn_send_smc_msg_with_param(smu,
+				SMU_MSG_ResetSDMA, inst_mask, NULL);
+		else if ((smu_program == 4) &&
+			(smu->smc_fw_version > 0x4556e6c))
+			ret = smu_cmn_send_smc_msg_with_param(smu,
+				      SMU_MSG_ResetSDMA2, inst_mask, NULL);
+		break;
+	case IP_VERSION(13, 0, 14):
+		if ((smu_program == 5) &&
+			(smu->smc_fw_version > 0x05550f00))
+			ret = smu_cmn_send_smc_msg_with_param(smu,
+				      SMU_MSG_ResetSDMA2, inst_mask, NULL);
+		break;
+	default:
+		break;
+	}
 
-	ret = smu_cmn_send_smc_msg_with_param(smu,
-					      SMU_MSG_ResetSDMA, inst_mask, NULL);
 	if (ret)
 		dev_err(smu->adev->dev,
 			"failed to send ResetSDMA event with mask 0x%x\n",

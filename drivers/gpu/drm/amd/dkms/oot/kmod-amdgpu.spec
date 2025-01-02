@@ -27,7 +27,7 @@ The AMD display driver kernel module in DKMS format for AMD graphics S/W
 
 %build
 pushd src
-%{__make} -f amd/dkms/oot/Makefile.oot KERNELVER=%(uname -r)
+%{__make} KERNELVER=%(uname -r)
 popd
 
 %install

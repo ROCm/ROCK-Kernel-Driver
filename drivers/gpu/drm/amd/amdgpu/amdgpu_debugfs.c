@@ -1827,14 +1827,12 @@ static int amdgpu_debugfs_vm_info_show(struct seq_file *m, void *unused)
 
 DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_test_ib);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_vm_info);
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_evict_vram_fops, amdgpu_debugfs_evict_vram,
 			 NULL, "%lld\n");
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_evict_gtt_fops, amdgpu_debugfs_evict_gtt,
 			 NULL, "%lld\n");
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_benchmark_fops, NULL, amdgpu_debugfs_benchmark,
 			 "%lld\n");
-#endif
 
 static void amdgpu_ib_preempt_fences_swap(struct amdgpu_ring *ring,
 					  struct dma_fence **fences)
@@ -2049,13 +2047,11 @@ out:
 	return ret;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(fops_ib_preempt, NULL,
 			amdgpu_debugfs_ib_preempt, "%llu\n");
 
 DEFINE_DEBUGFS_ATTRIBUTE(fops_sclk_set, NULL,
 			amdgpu_debugfs_sclk_set, "%llu\n");
-#endif
 
 int amdgpu_debugfs_init(struct amdgpu_device *adev)
 {
@@ -2066,7 +2062,6 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 	if (!debugfs_initialized())
 		return 0;
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_x32("amdgpu_smu_debug", 0600, root,
 			   &adev->pm.smu_debug_mask);
 
@@ -2083,7 +2078,6 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 		DRM_ERROR("unable to create amdgpu_set_sclk debugsfs file\n");
 		return PTR_ERR(ent);
 	}
-#endif
 
 	/* Register debugfs entries for amdgpu_ttm */
 	amdgpu_ttm_debugfs_init(adev);
@@ -2139,14 +2133,12 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 	amdgpu_securedisplay_debugfs_init(adev);
 	amdgpu_fw_attestation_debugfs_init(adev);
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file("amdgpu_evict_vram", 0400, root, adev,
 			    &amdgpu_evict_vram_fops);
 	debugfs_create_file("amdgpu_evict_gtt", 0400, root, adev,
 			    &amdgpu_evict_gtt_fops);
 	debugfs_create_file("amdgpu_benchmark", 0200, root, adev,
 			    &amdgpu_benchmark_fops);
-#endif
 	debugfs_create_file("amdgpu_test_ib", 0400, root, adev,
 			    &amdgpu_debugfs_test_ib_fops);
 	debugfs_create_file("amdgpu_vm_info", 0444, root, adev,

@@ -56,7 +56,7 @@ struct dc_stream_status {
 	int plane_count;
 	int audio_inst;
 	struct timing_sync_info timing_sync_info;
-	struct dc_plane_state *plane_states[MAX_SURFACE_NUM];
+	struct dc_plane_state *plane_states[MAX_SURFACES];
 	bool is_abm_supported;
 	struct mall_stream_config mall_stream_config;
 	bool fpo_in_use;
@@ -539,6 +539,11 @@ bool dc_stream_forward_crc_window(struct dc_stream_state *stream,
 		struct rect *rect,
 		uint8_t phy_id,
 		bool is_stop);
+
+bool dc_stream_forward_multiple_crc_window(struct dc_stream_state *stream,
+		struct crc_window *window,
+		uint8_t phy_id,
+		bool stop);
 #endif
 
 bool dc_stream_configure_crc(struct dc *dc,
@@ -549,6 +554,7 @@ bool dc_stream_configure_crc(struct dc *dc,
 
 bool dc_stream_get_crc(struct dc *dc,
 		       struct dc_stream_state *stream,
+		       uint8_t idx,
 		       uint32_t *r_cr,
 		       uint32_t *g_y,
 		       uint32_t *b_cb);

@@ -76,7 +76,6 @@ struct dc_perf_trace {
 	unsigned long last_entry_write;
 };
 
-#define MAX_SURFACE_NUM 6
 #define NUM_PIXEL_FORMATS 10
 
 enum tiling_mode {
@@ -875,6 +874,14 @@ struct dsc_dec_dpcd_caps {
 	bool is_dp; /* Decoded format */
 };
 
+struct hblank_expansion_dpcd_caps {
+	bool expansion_supported;
+	bool reduction_supported;
+	bool buffer_unit_bytes; /* True: buffer size in bytes. False: buffer size in pixels*/
+	bool buffer_per_port; /* True: buffer size per port. False: buffer size per lane*/
+	uint32_t buffer_size; /* Add 1 to value and multiply by 32 */
+};
+
 struct dc_golden_table {
 	uint16_t dc_golden_table_ver;
 	uint32_t aux_dphy_rx_control0_val;
@@ -932,9 +939,16 @@ enum backlight_control_type {
 };
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
+#define MAX_CRC_WINDOW_NUM	2
+
 struct otg_phy_mux {
 	uint8_t phy_output_num;
 	uint8_t otg_output_num;
+};
+
+struct crc_window {
+	struct rect rect;
+	bool enable;
 };
 #endif
 
@@ -1052,10 +1066,13 @@ enum replay_FW_Message_type {
 
 union replay_error_status {
 	struct {
-		unsigned char STATE_TRANSITION_ERROR    :1;
-		unsigned char LINK_CRC_ERROR            :1;
-		unsigned char DESYNC_ERROR              :1;
-		unsigned char RESERVED                  :5;
+		unsigned int STATE_TRANSITION_ERROR     :1;
+		unsigned int LINK_CRC_ERROR             :1;
+		unsigned int DESYNC_ERROR               :1;
+		unsigned int RESERVED_3                 :1;
+		unsigned int LOW_RR_INCORRECT_VTOTAL    :1;
+		unsigned int NO_DOUBLED_RR              :1;
+		unsigned int RESERVED_6_7               :2;
 	} bits;
 	unsigned char raw;
 };

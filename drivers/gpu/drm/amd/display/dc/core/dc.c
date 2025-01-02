@@ -615,6 +615,68 @@ dc_stream_forward_crc_window(struct dc_stream_state *stream,
 
 	return true;
 }
+
+static void
+dc_stream_forward_dmub_multiple_crc_window(struct dc_dmub_srv *dmub_srv,
+		struct crc_window *window, struct otg_phy_mux *mux_mapping, bool stop)
+{
+	int i;
+	union dmub_rb_cmd cmd = {0};
+
+	cmd.secure_display.mul_roi_ctl.phy_id = mux_mapping->phy_output_num;
+	cmd.secure_display.mul_roi_ctl.otg_id = mux_mapping->otg_output_num;
+
+	cmd.secure_display.header.type = DMUB_CMD__SECURE_DISPLAY;
+
+	if (stop) {
+		cmd.secure_display.header.sub_type = DMUB_CMD__SECURE_DISPLAY_MULTIPLE_CRC_STOP_UPDATE;
+	} else {
+		cmd.secure_display.header.sub_type = DMUB_CMD__SECURE_DISPLAY_MULTIPLE_CRC_WIN_NOTIFY;
+		for (i = 0; i < MAX_CRC_WINDOW_NUM; i++) {
+			cmd.secure_display.mul_roi_ctl.roi_ctl[i].x_start = window[i].rect.x;
+			cmd.secure_display.mul_roi_ctl.roi_ctl[i].y_start = window[i].rect.y;
+			cmd.secure_display.mul_roi_ctl.roi_ctl[i].x_end = window[i].rect.x + window[i].rect.width;
+			cmd.secure_display.mul_roi_ctl.roi_ctl[i].y_end = window[i].rect.y + window[i].rect.height;
+			cmd.secure_display.mul_roi_ctl.roi_ctl[i].enable = window[i].enable;
+		}
+	}
+
+	dc_wake_and_execute_dmub_cmd(dmub_srv->ctx, &cmd, DM_DMUB_WAIT_TYPE_NO_WAIT);
+}
+
+bool
+dc_stream_forward_multiple_crc_window(struct dc_stream_state *stream,
+		struct crc_window *window, uint8_t phy_id, bool stop)
+{
+	struct dc_dmub_srv *dmub_srv;
+	struct otg_phy_mux mux_mapping;
+	struct pipe_ctx *pipe;
+	int i;
+	struct dc *dc = stream->ctx->dc;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe = &dc->current_state->res_ctx.pipe_ctx[i];
+		if (pipe->stream == stream && !pipe->top_pipe && !pipe->prev_odm_pipe)
+			break;
+	}
+
+	/* Stream not found */
+	if (i == MAX_PIPES)
+		return false;
+
+	mux_mapping.phy_output_num = phy_id;
+	mux_mapping.otg_output_num = pipe->stream_res.tg->inst;
+
+	dmub_srv = dc->ctx->dmub_srv;
+
+	/* forward to dmub only. no dmcu support*/
+	if (dmub_srv)
+		dc_stream_forward_dmub_multiple_crc_window(dmub_srv, window, &mux_mapping, stop);
+	else
+		return false;
+
+	return true;
+}
 #endif /* CONFIG_DRM_AMD_SECURE_DISPLAY */
 
 /**
@@ -691,6 +753,7 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
  *
  * @dc: DC object.
  * @stream: The DC stream state of the stream to get CRCs from.
+ * @idx: index of crc engine to get CRC from
  * @r_cr: CRC value for the red component.
  * @g_y:  CRC value for the green component.
  * @b_cb: CRC value for the blue component.
@@ -700,7 +763,7 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
  * Return:
  * %false if stream is not found, or if CRCs are not enabled.
  */
-bool dc_stream_get_crc(struct dc *dc, struct dc_stream_state *stream,
+bool dc_stream_get_crc(struct dc *dc, struct dc_stream_state *stream, uint8_t idx,
 		       uint32_t *r_cr, uint32_t *g_y, uint32_t *b_cb)
 {
 	int i;
@@ -721,7 +784,7 @@ bool dc_stream_get_crc(struct dc *dc, struct dc_stream_state *stream,
 	tg = pipe->stream_res.tg;
 
 	if (tg->funcs->get_crc)
-		return tg->funcs->get_crc(tg, r_cr, g_y, b_cb);
+		return tg->funcs->get_crc(tg, idx, r_cr, g_y, b_cb);
 	DC_LOG_WARNING("CRC capture not supported.");
 	return false;
 }
@@ -1173,6 +1236,8 @@ static void dc_update_visual_confirm_color(struct dc *dc, struct dc_state *conte
 				get_mclk_switch_visual_confirm_color(pipe_ctx, &(pipe_ctx->visual_confirm_color));
 			else if (dc->debug.visual_confirm == VISUAL_CONFIRM_FAMS2)
 				get_fams2_visual_confirm_color(dc, context, pipe_ctx, &(pipe_ctx->visual_confirm_color));
+			else if (dc->debug.visual_confirm == VISUAL_CONFIRM_VABC)
+				get_vabc_visual_confirm_color(pipe_ctx, &(pipe_ctx->visual_confirm_color));
 		}
 	}
 }
@@ -2492,7 +2557,7 @@ static enum surface_update_type get_plane_info_update_type(const struct dc *dc, 
 
 
 	if (memcmp(&u->plane_info->tiling_info, &u->surface->tiling_info,
-			sizeof(union dc_tiling_info)) != 0) {
+			sizeof(struct dc_tiling_info)) != 0) {
 		update_flags->bits.swizzle_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED);
 
@@ -4520,7 +4585,7 @@ static bool commit_minimal_transition_based_on_current_context(struct dc *dc,
 	struct pipe_split_policy_backup policy;
 	struct dc_state *intermediate_context;
 	struct dc_state *old_current_state = dc->current_state;
-	struct dc_surface_update srf_updates[MAX_SURFACE_NUM] = {0};
+	struct dc_surface_update srf_updates[MAX_SURFACES] = {0};
 	int surface_count;
 
 	/*
@@ -5317,13 +5382,9 @@ void dc_set_power_state(struct dc *dc, enum dc_acpi_cm_power_state power_state)
 			dc->vm_pa_config.valid) {
 			dc->hwss.init_sys_ctx(dc->hwseq, dc, &dc->vm_pa_config);
 		}
-		/*mark d0 last*/
-		dc->power_state = power_state;
 		break;
 	default:
 		ASSERT(dc->current_state->stream_count == 0);
-		/*mark d3 first*/
-		dc->power_state = power_state;
 		dc_dmub_srv_notify_fw_dc_power_state(dc->ctx->dmub_srv, power_state);
 
 		dc_state_destruct(dc->current_state);

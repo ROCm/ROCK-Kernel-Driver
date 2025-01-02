@@ -26,6 +26,7 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
+#include "drm/drm_framebuffer.h"
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
@@ -93,12 +94,10 @@ enum dm_micro_swizzle {
 	MICRO_SWIZZLE_R = 3
 };
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 const struct drm_format_info *amdgpu_dm_plane_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
 {
 	return amdgpu_lookup_format_info(cmd->pixel_format, cmd->modifier[0]);
 }
-#endif
 
 void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 			       bool *per_pixel_alpha, bool *pre_multiplied_alpha,
@@ -180,7 +179,7 @@ static unsigned int amdgpu_dm_plane_modifier_gfx9_swizzle_mode(uint64_t modifier
 	return AMD_FMT_MOD_GET(TILE, modifier);
 }
 
-static void amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(union dc_tiling_info *tiling_info,
+static void amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(struct dc_tiling_info *tiling_info,
 							     uint64_t tiling_flags)
 {
 	/* Fill GFX8 params */
@@ -193,6 +192,7 @@ static void amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(union dc_tiling_inf
 		tile_split = AMDGPU_TILING_GET(tiling_flags, TILE_SPLIT);
 		num_banks = AMDGPU_TILING_GET(tiling_flags, NUM_BANKS);
 
+		tiling_info->gfxversion = DcGfxVersion8;
 		/* XXX fix me for VI */
 		tiling_info->gfx8.num_banks = num_banks;
 		tiling_info->gfx8.array_mode =
@@ -213,7 +213,7 @@ static void amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(union dc_tiling_inf
 }
 
 static void amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
-							      union dc_tiling_info *tiling_info)
+							      struct dc_tiling_info *tiling_info)
 {
 	/* Fill GFX9 params */
 	tiling_info->gfx9.num_pipes =
@@ -234,7 +234,7 @@ static void amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(const struct amdgp
 }
 
 static void amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(const struct amdgpu_device *adev,
-								union dc_tiling_info *tiling_info,
+								struct dc_tiling_info *tiling_info,
 								uint64_t modifier)
 {
 	unsigned int mod_bank_xor_bits = AMD_FMT_MOD_GET(BANK_XOR_BITS, modifier);
@@ -264,7 +264,7 @@ static void amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(const struct amd
 static int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
 					const enum surface_pixel_format format,
 					const enum dc_rotation_angle rotation,
-					const union dc_tiling_info *tiling_info,
+					const struct dc_tiling_info *tiling_info,
 					const struct dc_plane_dcc_param *dcc,
 					const struct dc_plane_address *address,
 					const struct plane_size *plane_size)
@@ -305,67 +305,13 @@ static int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
 
 	return 0;
 }
-static void
-fill_dcc_params_from_flags(const struct amdgpu_framebuffer *afb,
-                          struct dc_plane_dcc_param *dcc,
-                          struct dc_plane_address *address,
-                          const uint64_t flags)
-{
-    uint64_t dcc_address;
-    uint64_t plane_address = afb->address + afb->base.offsets[0];
-    uint32_t offset = AMDGPU_TILING_GET(flags, DCC_OFFSET_256B);
-    uint32_t i64b = AMDGPU_TILING_GET(flags, DCC_INDEPENDENT_64B) != 0;
 
-    if (!offset)
-        return;
-
-    dcc->enable = 1;
-    dcc->meta_pitch = AMDGPU_TILING_GET(flags, DCC_PITCH_MAX) + 1;
-    dcc->independent_64b_blks = i64b;
-
-	if (dcc->independent_64b_blks)
-		dcc->dcc_ind_blk = hubp_ind_block_64b;
-	else
-		dcc->dcc_ind_blk = hubp_ind_block_unconstrained;
-
-    dcc_address = plane_address + (uint64_t)offset * 256;
-    address->grph.meta_addr.low_part = lower_32_bits(dcc_address);
-    address->grph.meta_addr.high_part = upper_32_bits(dcc_address);
-}
-
-static int
-fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
-				      const struct amdgpu_framebuffer *afb,
-				      const enum surface_pixel_format format,
-				      const enum dc_rotation_angle rotation,
-				      const struct plane_size *plane_size,
-				      union dc_tiling_info *tiling_info,
-				      struct dc_plane_dcc_param *dcc,
-				      struct dc_plane_address *address,
-				      uint64_t tiling_flags)
-{
-	int ret;
-
-	amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(adev, tiling_info);
-
-	tiling_info->gfx9.swizzle =
-		AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
-
-	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags);
-	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, tiling_info, dcc, address, plane_size);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 								     const struct amdgpu_framebuffer *afb,
 								     const enum surface_pixel_format format,
 								     const enum dc_rotation_angle rotation,
 								     const struct plane_size *plane_size,
-								     union dc_tiling_info *tiling_info,
+								     struct dc_tiling_info *tiling_info,
 								     struct dc_plane_dcc_param *dcc,
 								     struct dc_plane_address *address)
 {
@@ -374,6 +320,7 @@ static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdg
 
 	amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(adev, tiling_info, modifier);
 	tiling_info->gfx9.swizzle = amdgpu_dm_plane_modifier_gfx9_swizzle_mode(modifier);
+	tiling_info->gfxversion = DcGfxVersion9;
 
 	if (amdgpu_dm_plane_modifier_has_dcc(modifier)) {
 		uint64_t dcc_address = afb->address + afb->base.offsets[1];
@@ -409,14 +356,13 @@ static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdg
 
 	return ret;
 }
-#endif
 
 static int amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 								      const struct amdgpu_framebuffer *afb,
 								      const enum surface_pixel_format format,
 								      const enum dc_rotation_angle rotation,
 								      const struct plane_size *plane_size,
-								      union dc_tiling_info *tiling_info,
+								      struct dc_tiling_info *tiling_info,
 								      struct dc_plane_dcc_param *dcc,
 								      struct dc_plane_address *address)
 {
@@ -427,6 +373,7 @@ static int amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(struct amd
 	amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(adev, tiling_info);
 
 	tiling_info->gfx9.swizzle = amdgpu_dm_plane_modifier_gfx9_swizzle_mode(modifier);
+	tiling_info->gfxversion = DcGfxAddr3;
 
 	if (amdgpu_dm_plane_modifier_has_dcc(modifier)) {
 		int max_compressed_block = AMD_FMT_MOD_GET(DCC_MAX_COMPRESSED_BLOCK, modifier);
@@ -894,7 +841,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 			     const enum surface_pixel_format format,
 			     const enum dc_rotation_angle rotation,
 			     const uint64_t tiling_flags,
-			     union dc_tiling_info *tiling_info,
+			     struct dc_tiling_info *tiling_info,
 			     struct plane_size *plane_size,
 			     struct dc_plane_dcc_param *dcc,
 			     struct dc_plane_address *address,
@@ -962,24 +909,12 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		if (ret)
 			return ret;
 	} else if (adev->family >= AMDGPU_FAMILY_AI) {
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
-		if (afb->base.flags & DRM_MODE_FB_MODIFIERS) {
 		ret = amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
 										rotation, plane_size,
 										tiling_info, dcc,
 										address);
-			if (ret)
-				return ret;
-		} else {
-#endif
-			ret = fill_gfx9_plane_attributes_from_flags(adev, afb, format, rotation,
-								    plane_size, tiling_info, dcc,
-								    address, tiling_flags);
-			if (ret)
-				return ret;
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
-		}
-#endif
+		if (ret)
+			return ret;
 	} else {
 		amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(tiling_info, tiling_flags);
 	}
@@ -1518,12 +1453,41 @@ static void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
 
 	amdgpu_dm_plane_handle_cursor_update(plane, old_state);
 }
+
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
+static void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
+{
+	struct dm_plane_state *dm_plane_state = to_dm_plane_state(plane->state);
+	struct drm_framebuffer *fb = plane->state->fb;
+	struct dc_plane_state *dc_plane_state;
+
+	if (!dm_plane_state || !dm_plane_state->dc_state)
+		return;
+
+	dc_plane_state = dm_plane_state->dc_state;
+
+	dc_plane_force_update_for_panic(dc_plane_state, fb->modifier ? true : false);
+}
+#endif
+
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = amdgpu_dm_plane_helper_prepare_fb,
 	.cleanup_fb = amdgpu_dm_plane_helper_cleanup_fb,
 	.atomic_check = amdgpu_dm_plane_atomic_check,
 	.atomic_async_check = amdgpu_dm_plane_atomic_async_check,
 	.atomic_async_update = amdgpu_dm_plane_atomic_async_update
+};
+
+static const struct drm_plane_helper_funcs dm_primary_plane_helper_funcs = {
+	.prepare_fb = amdgpu_dm_plane_helper_prepare_fb,
+	.cleanup_fb = amdgpu_dm_plane_helper_cleanup_fb,
+	.atomic_check = amdgpu_dm_plane_atomic_check,
+	.atomic_async_check = amdgpu_dm_plane_atomic_async_check,
+	.atomic_async_update = amdgpu_dm_plane_atomic_async_update,
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
+	.get_scanout_buffer = amdgpu_display_get_scanout_buffer,
+	.panic_flush = amdgpu_dm_plane_panic_flush,
+#endif
 };
 
 static void amdgpu_dm_plane_drm_plane_reset(struct drm_plane *plane)
@@ -1586,7 +1550,6 @@ static struct drm_plane_state *amdgpu_dm_plane_drm_plane_duplicate_state(struct 
 	return &dm_plane_state->base;
 }
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 						 uint32_t format,
 						 uint64_t modifier)
@@ -1648,7 +1611,6 @@ static bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 
 	return true;
 }
-#endif
 
 static void amdgpu_dm_plane_drm_plane_destroy_state(struct drm_plane *plane,
 						    struct drm_plane_state *state)
@@ -1862,9 +1824,7 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.reset = amdgpu_dm_plane_drm_plane_reset,
 	.atomic_duplicate_state = amdgpu_dm_plane_drm_plane_duplicate_state,
 	.atomic_destroy_state = amdgpu_dm_plane_drm_plane_destroy_state,
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.format_mod_supported = amdgpu_dm_plane_format_mod_supported,
-#endif
 #ifdef AMD_PRIVATE_COLOR
 	.atomic_set_property = dm_atomic_plane_set_property,
 	.atomic_get_property = dm_atomic_plane_get_property,
@@ -1886,11 +1846,9 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	num_formats = amdgpu_dm_plane_get_plane_formats(plane, plane_cap, formats,
 							ARRAY_SIZE(formats));
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	res = amdgpu_dm_plane_get_plane_modifiers(dm->adev, plane->type, &modifiers);
 	if (res)
 		return res;
-#endif
 
 #ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	if (modifiers == NULL)
@@ -1960,7 +1918,10 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	    plane->type != DRM_PLANE_TYPE_CURSOR)
 		drm_plane_enable_fb_damage_clips(plane);
 
-	drm_plane_helper_add(plane, &dm_plane_helper_funcs);
+	if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+		drm_plane_helper_add(plane, &dm_primary_plane_helper_funcs);
+	else
+		drm_plane_helper_add(plane, &dm_plane_helper_funcs);
 
 #ifdef AMD_PRIVATE_COLOR
 	dm_atomic_plane_attach_color_mgmt_properties(dm, plane);

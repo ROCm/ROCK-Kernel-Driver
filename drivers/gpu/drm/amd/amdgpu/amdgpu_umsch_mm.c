@@ -219,7 +219,7 @@ static int add_test_queue(struct amdgpu_device *adev,
 	queue_input.page_table_base_addr = amdgpu_gmc_pd_addr(test->vm->root.bo);
 
 	queue_input.process_va_start = 0;
-	queue_input.process_va_end = (adev->vm_manager.max_pfn - 1) << AMDGPU_GPU_PAGE_SHIFT;
+	queue_input.process_va_end = adev->vm_manager.max_pfn - 1;
 
 	queue_input.process_quantum = 100000; /* 10ms */
 	queue_input.process_csa_addr = test->ctx_data_gpu_addr +
