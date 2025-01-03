@@ -54,15 +54,15 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 			struct amdgpu_vm *vm, u64 gpu_addr, u32 size)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[xcc_id].ring;
-	int r;
+	int r = 0;
 
 	if (!adev->gfx.rlc.funcs->update_spm_vmid)
 		return -EINVAL;
 
     if (!vm->reserved_vmid[AMDGPU_GFXHUB(0)]) {
         r = amdgpu_vmid_alloc_reserved(adev, AMDGPU_GFXHUB(0));
-	if (r)
-		return r;
+        if (r)
+                return r;
         vm->reserved_vmid[AMDGPU_GFXHUB(0)] = true;
     }
 
