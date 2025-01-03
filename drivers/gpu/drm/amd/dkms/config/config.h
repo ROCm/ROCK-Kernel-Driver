@@ -419,9 +419,6 @@
 /* struct drm_dp_mst_topology_cbs->register_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR */
 
-/* struct drm_dp_mst_topology_mgr.base is available */
-#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE 1
-
 /* drm_dp_mst_topology_mgr_init() has max_lane_count and max_link_rate */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_MAX_LANE_COUNT */
 
@@ -640,6 +637,9 @@
 
 /* drm_print_memory_stats() is available */
 #define HAVE_DRM_PRINT_MEMORY_STATS 1
+
+/* struct drm_private_obj.lock is available */
+#define HAVE_DRM_PRIVATE_OBJ_LOCK 1
 
 /* drm_show_fdinfo() is available */
 #define HAVE_DRM_SHOW_FDINFO 1
