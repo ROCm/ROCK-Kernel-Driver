@@ -1,5 +1,5 @@
-#ifndef __KCL_BACKPORT_KCL_DRM_DRV_H_
-#define __KCL_BACKPORT_KCL_DRM_DRV_H__
+#ifndef __KCL_BACKPORT_KCL_DRM_FBDEV_TTM_H__
+#define __KCL_BACKPORT_KCL_DRM_FBDEV_TTM_H__
 
 #include <drm/drm_fbdev_ttm.h>
 #include <drm/drm_fb_helper.h>
