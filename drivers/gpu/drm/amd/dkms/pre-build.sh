@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# unset TMPDIR in this shell
+# otherwise conflicting package libpam-tmpdir incorrectly generates config
+unset TMPDIR
+
 KCL="amd/amdkcl"
 INC="include"
 SRC="amd/dkms"
