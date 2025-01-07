@@ -576,10 +576,13 @@ static int gfx_v9_4_3_init_cp_compute_microcode(struct amdgpu_device *adev,
 {
 	int err;
 
-	if (amdgpu_sriov_vf(adev))
+	if (amdgpu_sriov_vf(adev)) {
 		err = amdgpu_ucode_request(adev, &adev->gfx.mec_fw,
 				"amdgpu/%s_sjt_mec.bin", chip_name);
-	else
+		if (err)
+			err = amdgpu_ucode_request(adev, &adev->gfx.mec_fw,
+				"amdgpu/%s_mec.bin", chip_name);
+	} else
 		err = amdgpu_ucode_request(adev, &adev->gfx.mec_fw,
 				"amdgpu/%s_mec.bin", chip_name);
 	if (err)
