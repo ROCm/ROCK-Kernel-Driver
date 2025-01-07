@@ -38,10 +38,6 @@ static const struct file_operations __fops = {				\
 	.llseek  = no_llseek,						\
 }
 
-#undef DEFINE_DEBUGFS_ATTRIBUTE
-#define DEFINE_DEBUGFS_ATTRIBUTE(__fops, __get, __set, __fmt)	\
-	DEFINE_DEBUGFS_ATTRIBUTE_XSIGNED(__fops, __get, __set, __fmt, false)
-
 #define DEFINE_DEBUGFS_ATTRIBUTE_SIGNED(__fops, __get, __set, __fmt)	\
 	DEFINE_DEBUGFS_ATTRIBUTE_XSIGNED(__fops, __get, __set, __fmt, true)
 
