@@ -207,33 +207,12 @@ static int amdgpu_vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	return ret;
 }
 
-#ifdef AMDKCL_DRM_CONNECTOR_FUNCS_DPMS_MANDATORY
-static int
-amdgpu_vkms_connector_dpms(struct drm_connector *connector, int mode)
-{
-	return 0;
-}
-
-
-static int
-amdgpu_vkms_connector_set_property(struct drm_connector *connector,
-			 struct drm_property *property,
-			 uint64_t val)
-{
-	return 0;
-}
-#endif
-
 static const struct drm_connector_funcs amdgpu_vkms_connector_funcs = {
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = drm_connector_cleanup,
 	.reset = drm_atomic_helper_connector_reset,
 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-#ifdef AMDKCL_DRM_CONNECTOR_FUNCS_DPMS_MANDATORY
-	.set_property = amdgpu_vkms_connector_set_property,
-	.dpms = amdgpu_vkms_connector_dpms,
-#endif
 };
 
 static int amdgpu_vkms_conn_get_modes(struct drm_connector *connector)
