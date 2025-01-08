@@ -1248,28 +1248,12 @@ static void smu_init_xgmi_plpd_mode(struct smu_context *smu)
 	}
 }
 
-static bool smu_is_workload_profile_available(struct smu_context *smu,
-					      u32 profile)
-{
-	if (profile >= PP_SMC_POWER_PROFILE_COUNT)
-		return false;
-	return smu->workload_map && smu->workload_map[profile].valid_mapping;
-}
-
 static void smu_init_power_profile(struct smu_context *smu)
 {
-	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_UNKNOWN) {
-		if (smu->is_apu ||
-		    !smu_is_workload_profile_available(
-			    smu, PP_SMC_POWER_PROFILE_FULLSCREEN3D))
-			smu->workload_mask =
-				1 << smu->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT];
-		else
-			smu->workload_mask =
-				1 << smu->workload_prority[PP_SMC_POWER_PROFILE_FULLSCREEN3D];
-	}
+	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_UNKNOWN)
+		smu->power_profile_mode =
+			PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 
-	smu->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 }
 
 static int smu_sw_init(struct amdgpu_ip_block *ip_block)
