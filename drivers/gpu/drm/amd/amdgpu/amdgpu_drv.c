@@ -3000,12 +3000,6 @@ static struct drm_driver amdgpu_kms_driver = {
 	    ,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
-#if defined(CONFIG_DEBUG_FS)
-#if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
-	.debugfs_cleanup = amdgpu_debugfs_cleanup,
-#endif
-#endif
-
 #ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
