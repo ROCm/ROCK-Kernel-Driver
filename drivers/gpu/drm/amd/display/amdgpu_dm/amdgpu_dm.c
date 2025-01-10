@@ -2804,9 +2804,11 @@ void hdmi_cec_set_edid(struct amdgpu_dm_connector *aconnector)
 
 	if (!n)
 		return;
-
+		
+#ifdef HAVE_DRM_DISPLAY_INFO_SOURCE_PHYSICAL_ADDRESS 
 	cec_notifier_set_phys_addr(n,
 				   connector->display_info.source_physical_address);
+#endif
 }
 
 static void s3_handle_hdmi_cec(struct drm_device *ddev, bool suspend)

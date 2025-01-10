@@ -307,6 +307,9 @@
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
+/* struct drm_display_info->source_physical_address is available */
+#define HAVE_DRM_DISPLAY_INFO_SOURCE_PHYSICAL_ADDRESS 1
+
 /* drm_dp_add_payload_part2 has three arguments */
 /* #undef HAVE_DRM_DP_ADD_PAYLOAD_PART2_THREE_ARGUMENTS */
 
