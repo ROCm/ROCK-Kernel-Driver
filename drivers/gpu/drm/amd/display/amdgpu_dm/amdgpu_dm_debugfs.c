@@ -2906,7 +2906,9 @@ static ssize_t hdmi_cec_state_write(struct file *f, const char __user *buf,
 	} else {
 		if (!aconnector->notifier)
 			return -EINVAL;
+#ifdef HAVE_CEC_NOTIFIER_CONN_REGISTER
 		cec_notifier_conn_unregister(aconnector->notifier);
+#endif
 		aconnector->notifier = NULL;
 	}
 

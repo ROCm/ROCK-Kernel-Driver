@@ -7278,8 +7278,9 @@ static void amdgpu_dm_connector_unregister(struct drm_connector *connector)
 
 	if (amdgpu_dm_should_create_sysfs(amdgpu_dm_connector))
 		sysfs_remove_group(&connector->kdev->kobj, &amdgpu_group);
-
+#ifdef HAVE_CEC_NOTIFIER_CONN_REGISTER
 	cec_notifier_conn_unregister(amdgpu_dm_connector->notifier);
+#endif
 	drm_dp_aux_unregister(&amdgpu_dm_connector->dm_dp_aux.aux);
 }
 static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
@@ -8676,12 +8677,14 @@ int amdgpu_dm_initialize_hdmi_connector(struct amdgpu_dm_connector *aconnector)
 	}
 
 	cec_fill_conn_info_from_drm(&conn_info, &aconnector->base);
+#ifdef HAVE_CEC_NOTIFIER_CONN_REGISTER
 	aconnector->notifier =
 		cec_notifier_conn_register(hdmi_dev, NULL, &conn_info);
 	if (!aconnector->notifier) {
 		drm_err(ddev, "Failed to create cec notifier\n");
 		return -ENOMEM;
 	}
+#endif
 
 	return 0;
 }
