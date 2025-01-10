@@ -208,25 +208,23 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 	struct amdgpu_bo *aobj = gem_to_amdgpu_bo(gobj);
 	struct amdgpu_device *adev;
 
-	if (aobj) {
-		if (aobj->flags & AMDGPU_GEM_CREATE_NO_EVICT) {
-			if (!amdgpu_bo_reserve(aobj, false)) {
-				amdgpu_bo_unpin(aobj);
-				amdgpu_bo_unreserve(aobj);
-			}
+	if (aobj->flags & AMDGPU_GEM_CREATE_NO_EVICT) {
+		if (!amdgpu_bo_reserve(aobj, false)) {
+			amdgpu_bo_unpin(aobj);
+			amdgpu_bo_unreserve(aobj);
 		}
-
-		adev = amdgpu_ttm_adev(aobj->tbo.bdev);
-		if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
-			atomic64_sub(amdgpu_bo_size(aobj),
-				     &adev->direct_gma.vram_usage);
-		else if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
-			atomic64_sub(amdgpu_bo_size(aobj),
-				     &adev->direct_gma.gart_usage);
-
-		amdgpu_hmm_unregister(aobj);
-		ttm_bo_put(&aobj->tbo);
 	}
+
+	adev = amdgpu_ttm_adev(aobj->tbo.bdev);
+	if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
+		atomic64_sub(amdgpu_bo_size(aobj),
+			     &adev->direct_gma.vram_usage);
+	else if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
+		atomic64_sub(amdgpu_bo_size(aobj),
+			     &adev->direct_gma.gart_usage);
+
+	amdgpu_hmm_unregister(aobj);
+	ttm_bo_put(&aobj->tbo);
 }
 
 int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
