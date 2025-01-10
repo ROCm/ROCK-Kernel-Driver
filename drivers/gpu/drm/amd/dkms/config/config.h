@@ -79,6 +79,9 @@
 /* cancel_work() is available */
 #define HAVE_CANCEL_WORK 1
 
+/* struct cec_connector_info is available */
+#define HAVE_CEC_CONNECTOR_INFO 1
+
 /* cec_notifier_conn_register() is available */
 #define HAVE_CEC_NOTIFIER_CONN_REGISTER 1
 
