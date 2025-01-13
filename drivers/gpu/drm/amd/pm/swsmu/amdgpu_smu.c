@@ -1261,12 +1261,14 @@ static void smu_init_power_profile(struct smu_context *smu)
 		if (smu->is_apu ||
 		    !smu_is_workload_profile_available(
 			    smu, PP_SMC_POWER_PROFILE_FULLSCREEN3D))
-			smu->power_profile_mode =
-				PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
+			smu->workload_mask =
+				1 << smu->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT];
 		else
-			smu->power_profile_mode =
-				PP_SMC_POWER_PROFILE_FULLSCREEN3D;
+			smu->workload_mask =
+				1 << smu->workload_prority[PP_SMC_POWER_PROFILE_FULLSCREEN3D];
 	}
+
+	smu->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 }
 
 static int smu_sw_init(struct amdgpu_ip_block *ip_block)
@@ -1284,7 +1286,6 @@ static int smu_sw_init(struct amdgpu_ip_block *ip_block)
 	INIT_WORK(&smu->interrupt_work, smu_interrupt_work_fn);
 	atomic64_set(&smu->throttle_int_counter, 0);
 	smu->watermarks_bitmap = 0;
-	smu->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 	smu->default_power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 
 	for (i = 0; i < adev->vcn.num_vcn_inst; i++)
