@@ -101,7 +101,6 @@
 #define PPSMC_MSG_SetPhsDetOnOff                    0x4A
 #define PPSMC_MSG_GetPhsDetResidency                0x4B
 #define PPSMC_MSG_ResetSDMA                         0x4D
-#define PPSMC_MSG_ResetSDMA2                        0x45
 #define PPSMC_Message_Count                         0x4E
 
 //PPSMC Reset Types for driver msg argument
