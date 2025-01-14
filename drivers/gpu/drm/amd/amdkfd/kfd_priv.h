@@ -289,21 +289,26 @@ struct kfd_dev;
 struct kfd_dev_pc_sampling_data {
 	uint32_t use_count;         /* Num of PC sampling sessions */
 	uint32_t active_count;      /* Num of active sessions */
-	uint32_t target_simd;       /* target simd for trap */
-	uint32_t target_wave_slot;  /* target wave slot for trap */
-	struct idr pc_sampling_idr;
-	struct task_struct *pc_sample_thread;
 	struct kfd_pc_sample_info pc_sample_info;
 };
 
 struct kfd_dev_pcs_hosttrap {
+	struct kfd_dev_pc_sampling_data base;
+	uint32_t target_simd;       /* target simd for trap */
+	uint32_t target_wave_slot;  /* target wave slot for trap */
+	struct task_struct *pc_sample_thread;
+};
+
+struct kfd_dev_stochastic {
 	struct kfd_dev_pc_sampling_data base;
 };
 
 /* Per device PC Sampling data */
 struct kfd_dev_pc_sampling {
 	struct mutex mutex;
+	struct idr sampling_idr;
 	struct kfd_dev_pcs_hosttrap hosttrap_entry;
+	struct kfd_dev_stochastic stoch_entry;
 };
 
 struct kfd_node {
@@ -830,6 +835,7 @@ enum kfd_pdd_bound {
 
 struct pc_sampling_entry {
 	bool enabled;
+	enum kfd_ioctl_pc_sample_method method;
 	struct kfd_process_device *pdd;
 };
 

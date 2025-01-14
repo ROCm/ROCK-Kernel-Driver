@@ -27,15 +27,17 @@
 #include "kfd_debug.h"
 #include "kfd_device_queue_manager.h"
 
+#include <linux/bitops.h>
 /*
  * PC Sampling revision change log
  *
  * 0.1 - Initial revision
  * 0.2 - Support gfx9_4_3 Host Trap PC sampling
  * 0.3 - Fix gfx9_4_3 SQ hang issue
+ * 1.1 - Support gfx9_4_3 Stochastic PC sampling
  */
-#define KFD_IOCTL_PCS_MAJOR_VERSION	0
-#define KFD_IOCTL_PCS_MINOR_VERSION	3
+#define KFD_IOCTL_PCS_MAJOR_VERSION	1
+#define KFD_IOCTL_PCS_MINOR_VERSION	1
 
 struct supported_pc_sample_info {
 	uint32_t ip_version;
@@ -45,9 +47,14 @@ struct supported_pc_sample_info {
 const struct kfd_pc_sample_info sample_info_hosttrap_9_0_0 = {
 	0, 1, ~0ULL, 0, KFD_IOCTL_PCS_METHOD_HOSTTRAP, KFD_IOCTL_PCS_TYPE_TIME_US };
 
+const struct kfd_pc_sample_info sample_info_stoch_cycle_9_4_3 = {
+	0, 256, (1ULL << 31), KFD_IOCTL_PCS_FLAG_POWER_OF_2,
+	    KFD_IOCTL_PCS_METHOD_STOCHASTIC, KFD_IOCTL_PCS_TYPE_CLOCK_CYCLES };
+
 struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(9, 4, 2), &sample_info_hosttrap_9_0_0 },
 	{ IP_VERSION(9, 4, 3), &sample_info_hosttrap_9_0_0 },
+	{ IP_VERSION(9, 4, 3), &sample_info_stoch_cycle_9_4_3 },
 };
 
 static int kfd_pc_sample_thread(void *param)
@@ -85,14 +92,14 @@ static int kfd_pc_sample_thread(void *param)
 			node->kfd2kgd->override_core_cg(adev, 1, inst);
 
 	while (!kthread_should_stop() &&
-			!signal_pending(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
+			!signal_pending(node->pcs_data.hosttrap_entry.pc_sample_thread)) {
 		if (!need_wait) {
 			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
 
 			for_each_inst(inst, node->xcc_mask) {
 			node->kfd2kgd->trigger_pc_sample_trap(adev, node->vm_info.last_vmid_kfd,
-					&node->pcs_data.hosttrap_entry.base.target_simd,
-					&node->pcs_data.hosttrap_entry.base.target_wave_slot,
+					&node->pcs_data.hosttrap_entry.target_simd,
+					&node->pcs_data.hosttrap_entry.target_wave_slot,
 					node->pcs_data.hosttrap_entry.base.pc_sample_info.method,
 					inst);
 			}
@@ -118,9 +125,9 @@ static int kfd_pc_sample_thread(void *param)
 		for_each_inst(inst, node->xcc_mask)
 			node->kfd2kgd->override_core_cg(adev, 0, inst);
 
-	node->pcs_data.hosttrap_entry.base.target_simd = 0;
-	node->pcs_data.hosttrap_entry.base.target_wave_slot = 0;
-	node->pcs_data.hosttrap_entry.base.pc_sample_thread = NULL;
+	node->pcs_data.hosttrap_entry.target_simd = 0;
+	node->pcs_data.hosttrap_entry.target_wave_slot = 0;
+	node->pcs_data.hosttrap_entry.pc_sample_thread = NULL;
 
 	return 0;
 }
@@ -131,12 +138,12 @@ static int kfd_pc_sample_thread_start(struct kfd_node *node)
 	int ret = 0;
 
 	snprintf(thread_name, 16, "pcs_%d", node->adev->ddev.render->index);
-	node->pcs_data.hosttrap_entry.base.pc_sample_thread =
+	node->pcs_data.hosttrap_entry.pc_sample_thread =
 		kthread_run(kfd_pc_sample_thread, node, thread_name);
 
-	if (IS_ERR(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
-		ret = PTR_ERR(node->pcs_data.hosttrap_entry.base.pc_sample_thread);
-		node->pcs_data.hosttrap_entry.base.pc_sample_thread = NULL;
+	if (IS_ERR(node->pcs_data.hosttrap_entry.pc_sample_thread)) {
+		ret = PTR_ERR(node->pcs_data.hosttrap_entry.pc_sample_thread);
+		node->pcs_data.hosttrap_entry.pc_sample_thread = NULL;
 		pr_debug("Failed to create pc sample thread for %s with ret = %d.",
 			thread_name, ret);
 	}
@@ -169,14 +176,30 @@ static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
 	ret = 0;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
 	if (user_args->flags != KFD_IOCTL_PCS_QUERY_TYPE_FULL &&
-			pdd->dev->pcs_data.hosttrap_entry.base.use_count) {
-		/* If we already have a session, restrict returned list to current method  */
-		user_args->num_sample_info = 1;
+		(pdd->dev->pcs_data.hosttrap_entry.base.use_count ||
+		 pdd->dev->pcs_data.stoch_entry.base.use_count)) {
+		user_args->num_sample_info = 0;
 
-		if (user_args->sample_info_ptr)
-			ret = copy_to_user((void __user *) user_args->sample_info_ptr,
-				&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
-				sizeof(struct kfd_pc_sample_info));
+		/* If we already have a session, restrict returned list to current method  */
+		if (pdd->dev->pcs_data.stoch_entry.base.use_count) {
+			user_args->num_sample_info++;
+			if (user_args->sample_info_ptr &&
+				user_args->num_sample_info <= user_num_sample_info) {
+				ret = copy_to_user((void __user *) user_args->sample_info_ptr,
+					&pdd->dev->pcs_data.stoch_entry.base.pc_sample_info,
+					sizeof(struct kfd_pc_sample_info));
+				user_args->sample_info_ptr += sizeof(struct kfd_pc_sample_info);
+			}
+		}
+
+		if (pdd->dev->pcs_data.hosttrap_entry.base.use_count) {
+			user_args->num_sample_info++;
+			if (user_args->sample_info_ptr &&
+				user_args->num_sample_info <= user_num_sample_info)
+				ret |= copy_to_user((void __user *) user_args->sample_info_ptr,
+					&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
+					sizeof(struct kfd_pc_sample_info));
+		}
 		mutex_unlock(&pdd->dev->pcs_data.mutex);
 		return ret ? -EFAULT : 0;
 	}
@@ -220,25 +243,47 @@ static int kfd_pc_sample_start(struct kfd_process_device *pdd,
 	pcs_entry->enabled = true;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
 
-	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd,
-		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info.method, true);
+	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd, pcs_entry->method, true);
 
-	if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
-		pc_sampling_start = true;
+	if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+		if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
+			pc_sampling_start = true;
 
-	pdd->dev->pcs_data.hosttrap_entry.base.active_count++;
+		pdd->dev->pcs_data.hosttrap_entry.base.active_count++;
+	} else { /* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
+		if (!pdd->dev->pcs_data.stoch_entry.base.active_count)
+			pc_sampling_start = true;
+
+		pdd->dev->pcs_data.stoch_entry.base.active_count++;
+	}
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
 
 	while (pc_sampling_start) {
-		/* true means pc_sample_thread stop is in progress */
-		if (READ_ONCE(pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
-			usleep_range(1000, 2000);
-		} else {
-			ret = kfd_pc_sample_thread_start(pdd->dev);
+		if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+			/* true means pc_sample_thread stop is in progress */
+			if (READ_ONCE(pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread)) {
+				usleep_range(1000, 2000);
+			} else {
+				ret = kfd_pc_sample_thread_start(pdd->dev);
+				break;
+			}
+		} else {/* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
+			struct amdgpu_device *adev = pdd->dev->adev;
+			struct kfd_node *node = pdd->dev;
+			uint64_t interval;
+			uint32_t inst;
+
+			interval = node->pcs_data.stoch_entry.base.pc_sample_info.interval;
+			if (pdd->dev->kfd2kgd->setup_stoch_sampling)
+				for_each_inst(inst, node->xcc_mask)
+					pdd->dev->kfd2kgd->setup_stoch_sampling(adev,
+					node->compute_vmid_bitmap, true,
+					node->pcs_data.stoch_entry.base.pc_sample_info.type,
+					interval,
+					inst);
 			break;
 		}
 	}
-
 	return ret;
 }
 
@@ -249,19 +294,38 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
 
 	pcs_entry->enabled = false;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
-	pdd->dev->pcs_data.hosttrap_entry.base.active_count--;
-	if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
-		pc_sampling_stop = true;
-
+	if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+		pdd->dev->pcs_data.hosttrap_entry.base.active_count--;
+		if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
+			pc_sampling_stop = true;
+	} else {/* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
+		pdd->dev->pcs_data.stoch_entry.base.active_count--;
+		if (!pdd->dev->pcs_data.stoch_entry.base.active_count)
+			pc_sampling_stop = true;
+	}
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
 
-	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd,
-		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info.method, false);
+	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd, pcs_entry->method, false);
 	remap_queue(pdd->dev->dqm,
 		KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
 
-	if (pc_sampling_stop)
-		kthread_stop(pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_thread);
+	if (pc_sampling_stop) {
+		if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+			kthread_stop(pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread);
+		} else {/* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
+			struct amdgpu_device *adev = pdd->dev->adev;
+			struct kfd_node *node = pdd->dev;
+			uint32_t inst;
+
+			if (pdd->dev->kfd2kgd->setup_stoch_sampling) {
+				for_each_inst(inst, node->xcc_mask)
+					pdd->dev->kfd2kgd->setup_stoch_sampling(adev,
+					    node->compute_vmid_bitmap, false,
+					    node->pcs_data.stoch_entry.base.pc_sample_info.type,
+					    0, inst);
+			}
+		}
+	}
 
 	return 0;
 }
@@ -309,14 +373,26 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 	}
 
 	mutex_lock(&pdd->dev->pcs_data.mutex);
-	if (pdd->dev->pcs_data.hosttrap_entry.base.use_count &&
-		memcmp(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
-				&user_info, sizeof(user_info))) {
-		ret = copy_to_user((void __user *) user_args->sample_info_ptr,
-			&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
-			sizeof(struct kfd_pc_sample_info));
-		mutex_unlock(&pdd->dev->pcs_data.mutex);
-		return ret ? -EFAULT : -EEXIST;
+	if (supported_format->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+		if (pdd->dev->pcs_data.hosttrap_entry.base.use_count &&
+			memcmp(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
+					&user_info, sizeof(user_info))) {
+			ret = copy_to_user((void __user *) user_args->sample_info_ptr,
+				&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
+				sizeof(struct kfd_pc_sample_info));
+			mutex_unlock(&pdd->dev->pcs_data.mutex);
+			return ret ? -EFAULT : -EEXIST;
+			}
+	} else { /* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
+		if (pdd->dev->pcs_data.stoch_entry.base.use_count &&
+			memcmp(&pdd->dev->pcs_data.stoch_entry.base.pc_sample_info,
+					&user_info, sizeof(user_info))) {
+			ret = copy_to_user((void __user *) user_args->sample_info_ptr,
+				&pdd->dev->pcs_data.stoch_entry.base.pc_sample_info,
+				sizeof(struct kfd_pc_sample_info));
+			mutex_unlock(&pdd->dev->pcs_data.mutex);
+			return ret ? -EFAULT : -EEXIST;
+		}
 	}
 
 	pcs_entry = kzalloc(sizeof(*pcs_entry), GFP_KERNEL);
@@ -325,7 +401,7 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 		return -ENOMEM;
 	}
 
-	i = idr_alloc_cyclic(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr,
+	i = idr_alloc_cyclic(&pdd->dev->pcs_data.sampling_idr,
 				pcs_entry, 1, 0, GFP_KERNEL);
 	if (i < 0) {
 		mutex_unlock(&pdd->dev->pcs_data.mutex);
@@ -333,13 +409,20 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 		return i;
 	}
 
-	if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
-		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info = user_info;
+	if (supported_format->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+		if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
+			pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info = user_info;
+		pdd->dev->pcs_data.hosttrap_entry.base.use_count++;
+	} else if (supported_format->method == KFD_IOCTL_PCS_METHOD_STOCHASTIC) {
+		if (!pdd->dev->pcs_data.stoch_entry.base.use_count)
+			pdd->dev->pcs_data.stoch_entry.base.pc_sample_info = user_info;
+		pdd->dev->pcs_data.stoch_entry.base.use_count++;
+	}
 
-	pdd->dev->pcs_data.hosttrap_entry.base.use_count++;
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
 
 	pcs_entry->pdd = pdd;
+	pcs_entry->method = supported_format->method;
 	user_args->trace_id = (uint32_t)i;
 
 	/*
@@ -350,7 +433,8 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 	kfd_dbg_enable_ttmp_setup(pdd->process);
 	pdd->process->pc_sampling_ref++;
 
-	pr_debug("alloc pcs_entry = %p, trace_id = 0x%x on gpu 0x%x", pcs_entry, i, pdd->dev->id);
+	pr_debug("alloc pcs_entry = %p, trace_id = 0x%x method = %d on gpu 0x%x",
+				pcs_entry, i, pcs_entry->method, pdd->dev->id);
 
 	return 0;
 }
@@ -363,12 +447,19 @@ static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_
 
 	pdd->process->pc_sampling_ref--;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
-	pdd->dev->pcs_data.hosttrap_entry.base.use_count--;
-	idr_remove(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr, trace_id);
+	if (pcs_entry->method == KFD_IOCTL_PCS_METHOD_HOSTTRAP) {
+		pdd->dev->pcs_data.hosttrap_entry.base.use_count--;
+		if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
+			memset(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info, 0x0,
+				sizeof(struct kfd_pc_sample_info));
+	} else { /* KFD_IOCTL_PCS_METHOD_STOCHASTIC */
+		pdd->dev->pcs_data.stoch_entry.base.use_count--;
+		if (!pdd->dev->pcs_data.stoch_entry.base.use_count)
+			memset(&pdd->dev->pcs_data.stoch_entry.base.pc_sample_info, 0x0,
+				sizeof(struct kfd_pc_sample_info));
+	}
 
-	if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
-		memset(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info, 0x0,
-			sizeof(struct kfd_pc_sample_info));
+	idr_remove(&pdd->dev->pcs_data.sampling_idr, trace_id);
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
 
 	kfree(pcs_entry);
@@ -383,7 +474,7 @@ void kfd_pc_sample_release(struct kfd_process_device *pdd)
 	uint32_t id;
 
 	/* force to release all PC sampling task for this process */
-	idp = &pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr;
+	idp = &pdd->dev->pcs_data.sampling_idr;
 	do {
 		pcs_entry = NULL;
 		mutex_lock(&pdd->dev->pcs_data.mutex);
@@ -410,7 +501,7 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 		args->op != KFD_IOCTL_PCS_OP_CREATE) {
 
 		mutex_lock(&pdd->dev->pcs_data.mutex);
-		pcs_entry = idr_find(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr,
+		pcs_entry = idr_find(&pdd->dev->pcs_data.sampling_idr,
 				args->trace_id);
 		mutex_unlock(&pdd->dev->pcs_data.mutex);
 
