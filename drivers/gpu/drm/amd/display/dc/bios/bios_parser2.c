@@ -1792,7 +1792,7 @@ static enum bp_result get_firmware_info_v3_1(
 	dce_info = GET_IMAGE(struct atom_display_controller_info_v4_1,
 			DATA_TABLES(dce_info));
 
-	if (!firmware_info || !dce_info)
+	if (!firmware_info || !firmware_info32 || !dce_info)
 		return BP_RESULT_BADBIOSTABLE;
 
 	memset(info, 0, sizeof(*info));
