@@ -1823,7 +1823,7 @@ static enum bp_result get_firmware_info_v3_1(
 	/* These fields are marked as reserved in v3_1, but they appear to be populated
 	 * properly.
 	 */
-	if (firmware_info32->board_i2c_feature_id == 0x2) {
+	if (firmware_info32 && firmware_info32->board_i2c_feature_id == 0x2) {
 		info->oem_i2c_present = true;
 		info->oem_i2c_obj_id = firmware_info32->board_i2c_feature_gpio_id;
 	} else {
