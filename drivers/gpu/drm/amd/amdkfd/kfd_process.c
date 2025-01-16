@@ -2146,7 +2146,7 @@ void kfd_process_schedule_restore(struct kfd_process *p)
 	else
 		delay_jiffies = 0;
 
-	pr_debug("Process %d schedule restore work\n", p->pasid);
+	pr_debug("Process pid %d schedule restore work\n", p->lead_thread->pid);
 	if (mod_delayed_work(kfd_restore_wq, &p->restore_work, delay_jiffies))
 		kfd_process_restore_queues(p);
 }
@@ -2293,12 +2293,12 @@ static void restore_process_worker(struct work_struct *work)
 	p = container_of(dwork, struct kfd_process, restore_work);
 
 	if (kfd_process_unmap_doorbells_if_idle(p)) {
-		pr_debug("Process %d queues idle, doorbell unmapped\n",
-			 p->pasid);
+		pr_debug("Process pid %d queues idle, doorbell unmapped\n",
+			 (int)p->lead_thread->pid);
 		return;
 	}
 
-	pr_debug("Started restoring process pasid %d\n", (int)p->lead_thread->pid);
+	pr_debug("Started restoring process pid %d\n", (int)p->lead_thread->pid);
 	trace_kfd_restore_process_worker_start(p);
 
 	/* Setting last_restore_timestamp before successful restoration.
