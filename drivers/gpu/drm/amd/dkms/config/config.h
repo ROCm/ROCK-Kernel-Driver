@@ -244,6 +244,9 @@
 /* struct drm_connector_state has hdcp_content_type member */
 #define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
+/* drm_connector_state->hdmi.broadcast_rgb is available */
+#define HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB 1
+
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
 
