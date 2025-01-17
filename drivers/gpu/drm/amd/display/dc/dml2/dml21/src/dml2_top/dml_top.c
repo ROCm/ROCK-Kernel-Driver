@@ -153,7 +153,6 @@ bool dml2_build_mode_programming(struct dml2_build_mode_programming_in_out *in_o
 	bool uclk_pstate_success = false;
 	bool vmin_success = false;
 	bool stutter_success = false;
-	unsigned int i;
 
 	memset(l, 0, sizeof(struct dml2_build_mode_programming_locals));
 	memset(in_out->programming, 0, sizeof(struct dml2_display_cfg_programming));
@@ -297,13 +296,6 @@ bool dml2_build_mode_programming(struct dml2_build_mode_programming_in_out *in_o
 	if (stutter_success) {
 		memcpy(&l->base_display_config_with_meta, &l->optimized_display_config_with_meta, sizeof(struct display_configuation_with_meta));
 		l->base_display_config_with_meta.stage5.success = true;
-	}
-
-	/*
-	* Populate mcache programming
-	*/
-	for (i = 0; i < in_out->display_config->num_planes; i++) {
-		in_out->programming->plane_programming[i].mcache_allocation = l->base_display_config_with_meta.stage2.mcache_allocations[i];
 	}
 
 	/*
