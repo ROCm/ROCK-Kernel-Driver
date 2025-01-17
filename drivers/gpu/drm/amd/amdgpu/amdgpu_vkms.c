@@ -596,9 +596,9 @@ static const struct amdgpu_irq_src_funcs amdgpu_vkms_crtc_irq_funcs = {
 	.process = NULL,
 };
 
-static int amdgpu_vkms_early_init(void *handle)
+static int amdgpu_vkms_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->crtc_irq.num_types = adev->mode_info.num_crtc;
 	adev->crtc_irq.funcs = &amdgpu_vkms_crtc_irq_funcs;
