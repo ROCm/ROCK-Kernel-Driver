@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.315"
+#define DC_VER "3.2.316"
 
 #define MAX_SURFACES 4
 #define MAX_PLANES 6
@@ -1949,6 +1949,9 @@ enum aux_return_code_type;
 int dc_link_aux_transfer_raw(struct ddc_service *ddc,
 		struct aux_payload *payload,
 		enum aux_return_code_type *operation_result);
+
+struct ddc_service *
+dc_get_oem_i2c_device(struct dc *dc);
 
 bool dc_is_oem_i2c_device_present(
 	struct dc *dc,

@@ -617,6 +617,13 @@ struct amdgpu_display_manager {
 	 * Bounding box data read from dmub during early initialization for DCN4+
 	 */
 	struct dml2_soc_bb *bb_from_dmub;
+
+	/**
+	 * @oem_i2c:
+	 *
+	 * OEM i2c bus
+	 */
+	struct amdgpu_i2c_adapter *oem_i2c;
 };
 
 enum dsc_clock_force_state {
@@ -682,6 +689,8 @@ struct amdgpu_dm_connector {
 	uint32_t connector_id;
 	int bl_idx;
 
+	struct cec_notifier *notifier;
+
 	/* we need to mind the EDID between detect
 	   and get modes due to analog/digital/tvencoder */
 #ifdef HAVE_DRM_DP_MST_EDID_READ
@@ -712,6 +721,8 @@ struct amdgpu_dm_connector {
 	struct drm_dp_mst_port *mst_output_port;
 	struct amdgpu_dm_connector *mst_root;
 	struct drm_dp_aux *dsc_aux;
+	uint32_t mst_local_bw;
+	uint16_t vc_full_pbn;
 	struct mutex handle_mst_msg_ready;
 
 	/* TODO see if we can merge with ddc_bus or make a dm_connector */
@@ -1030,5 +1041,9 @@ void dm_free_gpu_mem(struct amdgpu_device *adev,
 						  void *addr);
 
 bool amdgpu_dm_is_headless(struct amdgpu_device *adev);
+
+void hdmi_cec_set_edid(struct amdgpu_dm_connector *aconnector);
+void hdmi_cec_unset_edid(struct amdgpu_dm_connector *aconnector);
+int amdgpu_dm_initialize_hdmi_connector(struct amdgpu_dm_connector *aconnector);
 
 #endif /* __AMDGPU_DM_H__ */

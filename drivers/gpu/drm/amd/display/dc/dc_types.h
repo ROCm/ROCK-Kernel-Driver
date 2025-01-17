@@ -1119,6 +1119,8 @@ struct replay_config {
 	union replay_error_status replay_error_status;
 	/* Replay Low Hz enable Options */
 	union replay_low_refresh_rate_enable_options low_rr_enable_options;
+	/* Replay coasting vtotal is within low refresh rate range. */
+	bool low_rr_activated;
 };
 
 /* Replay feature flags*/
@@ -1143,10 +1145,12 @@ struct replay_settings {
 	uint32_t defer_update_coasting_vtotal_table[PR_COASTING_TYPE_NUM];
 	/* Maximum link off frame count */
 	uint32_t link_off_frame_count;
-	/* Replay pseudo vtotal for abm + ips on full screen video which can improve ips residency */
-	uint16_t abm_with_ips_on_full_screen_video_pseudo_vtotal;
+	/* Replay pseudo vtotal for low refresh rate*/
+	uint16_t low_rr_full_screen_video_pseudo_vtotal;
 	/* Replay last pseudo vtotal set to DMUB */
 	uint16_t last_pseudo_vtotal;
+	/* Replay desync error */
+	uint32_t replay_desync_error_fail_count;
 };
 
 /* To split out "global" and "per-panel" config settings.

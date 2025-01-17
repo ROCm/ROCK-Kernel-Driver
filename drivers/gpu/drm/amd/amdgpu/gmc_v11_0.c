@@ -578,6 +578,7 @@ static void gmc_v11_0_set_mmhub_funcs(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(3, 3, 0):
 	case IP_VERSION(3, 3, 1):
+	case IP_VERSION(3, 3, 2):
 		adev->mmhub.funcs = &mmhub_v3_3_funcs;
 		break;
 	default:
@@ -595,6 +596,7 @@ static void gmc_v11_0_set_gfxhub_funcs(struct amdgpu_device *adev)
 	case IP_VERSION(11, 5, 0):
 	case IP_VERSION(11, 5, 1):
 	case IP_VERSION(11, 5, 2):
+	case IP_VERSION(11, 5, 3):
 		adev->gfxhub.funcs = &gfxhub_v11_5_0_funcs;
 		break;
 	default:
@@ -757,6 +759,7 @@ static int gmc_v11_0_sw_init(struct amdgpu_ip_block *ip_block)
 	case IP_VERSION(11, 5, 0):
 	case IP_VERSION(11, 5, 1):
 	case IP_VERSION(11, 5, 2):
+	case IP_VERSION(11, 5, 3):
 		set_bit(AMDGPU_GFXHUB(0), adev->vmhubs_mask);
 		set_bit(AMDGPU_MMHUB0(0), adev->vmhubs_mask);
 		/*

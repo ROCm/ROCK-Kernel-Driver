@@ -2054,6 +2054,7 @@ void amdgpu_gfx_enforce_isolation_ring_begin_use(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	u32 idx;
+	bool sched_work = false;
 
 	if (!adev->gfx.enable_cleaner_shader)
 		return;
@@ -2072,9 +2073,12 @@ void amdgpu_gfx_enforce_isolation_ring_begin_use(struct amdgpu_ring *ring)
 	mutex_lock(&adev->enforce_isolation_mutex);
 	if (adev->enforce_isolation[idx]) {
 		if (adev->kfd.init_complete)
-			amdgpu_gfx_kfd_sch_ctrl(adev, idx, false);
+			sched_work = true;
 	}
 	mutex_unlock(&adev->enforce_isolation_mutex);
+
+	if (sched_work)
+		amdgpu_gfx_kfd_sch_ctrl(adev, idx, false);
 }
 
 /**
@@ -2090,6 +2094,7 @@ void amdgpu_gfx_enforce_isolation_ring_end_use(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	u32 idx;
+	bool sched_work = false;
 
 	if (!adev->gfx.enable_cleaner_shader)
 		return;
@@ -2105,9 +2110,69 @@ void amdgpu_gfx_enforce_isolation_ring_end_use(struct amdgpu_ring *ring)
 	mutex_lock(&adev->enforce_isolation_mutex);
 	if (adev->enforce_isolation[idx]) {
 		if (adev->kfd.init_complete)
-			amdgpu_gfx_kfd_sch_ctrl(adev, idx, true);
+			sched_work = true;
 	}
 	mutex_unlock(&adev->enforce_isolation_mutex);
+
+	if (sched_work)
+		amdgpu_gfx_kfd_sch_ctrl(adev, idx, true);
+}
+
+void amdgpu_gfx_profile_idle_work_handler(struct work_struct *work)
+{
+	struct amdgpu_device *adev =
+		container_of(work, struct amdgpu_device, gfx.idle_work.work);
+	enum PP_SMC_POWER_PROFILE profile;
+	u32 i, fences = 0;
+	int r;
+
+	if (adev->gfx.num_gfx_rings)
+		profile = PP_SMC_POWER_PROFILE_FULLSCREEN3D;
+	else
+		profile = PP_SMC_POWER_PROFILE_COMPUTE;
+
+	for (i = 0; i < AMDGPU_MAX_GFX_RINGS; ++i)
+		fences += amdgpu_fence_count_emitted(&adev->gfx.gfx_ring[i]);
+	for (i = 0; i < (AMDGPU_MAX_COMPUTE_RINGS * AMDGPU_MAX_GC_INSTANCES); ++i)
+		fences += amdgpu_fence_count_emitted(&adev->gfx.compute_ring[i]);
+	if (!fences && !atomic_read(&adev->gfx.total_submission_cnt)) {
+		r = amdgpu_dpm_switch_power_profile(adev, profile, false);
+		if (r)
+			dev_warn(adev->dev, "(%d) failed to disable %s power profile mode\n", r,
+				 profile == PP_SMC_POWER_PROFILE_FULLSCREEN3D ?
+				 "fullscreen 3D" : "compute");
+	} else {
+		schedule_delayed_work(&adev->gfx.idle_work, GFX_PROFILE_IDLE_TIMEOUT);
+	}
+}
+
+void amdgpu_gfx_profile_ring_begin_use(struct amdgpu_ring *ring)
+{
+	struct amdgpu_device *adev = ring->adev;
+	enum PP_SMC_POWER_PROFILE profile;
+	int r;
+
+	if (adev->gfx.num_gfx_rings)
+		profile = PP_SMC_POWER_PROFILE_FULLSCREEN3D;
+	else
+		profile = PP_SMC_POWER_PROFILE_COMPUTE;
+
+	atomic_inc(&adev->gfx.total_submission_cnt);
+
+	if (!cancel_delayed_work_sync(&adev->gfx.idle_work)) {
+		r = amdgpu_dpm_switch_power_profile(adev, profile, true);
+		if (r)
+			dev_warn(adev->dev, "(%d) failed to disable %s power profile mode\n", r,
+				 profile == PP_SMC_POWER_PROFILE_FULLSCREEN3D ?
+				 "fullscreen 3D" : "compute");
+	}
+}
+
+void amdgpu_gfx_profile_ring_end_use(struct amdgpu_ring *ring)
+{
+	atomic_dec(&ring->adev->gfx.total_submission_cnt);
+
+	schedule_delayed_work(&ring->adev->gfx.idle_work, GFX_PROFILE_IDLE_TIMEOUT);
 }
 
 /*

@@ -30,6 +30,7 @@
 #include "amdgpu_dm.h"
 #include "dc.h"
 #include "amdgpu_securedisplay.h"
+#include "amdgpu_dm_psr.h"
 
 static const char *const pipe_crc_sources[] = {
 	"none",
@@ -316,7 +317,7 @@ static void amdgpu_dm_set_crc_window_default(struct drm_crtc *crtc, struct dc_st
 	spin_unlock_irqrestore(&drm_dev->event_lock, flags);
 
 	/* Disable secure_display if it was enabled */
-	if (was_activated) {
+	if (was_activated && dm->secure_display_ctx.op_mode == LEGACY_MODE) {
 		/* stop ROI update on this crtc */
 		flush_work(&dm->secure_display_ctx.crtc_ctx[crtc->index].notify_ta_work);
 		flush_work(&dm->secure_display_ctx.crtc_ctx[crtc->index].forward_roi_work);
@@ -507,10 +508,14 @@ int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 
 	mutex_lock(&adev->dm.dc_lock);
 
+	/* For PSR1, check that the panel has exited PSR */
+	if (stream_state->link->psr_settings.psr_version < DC_PSR_VERSION_SU_1)
+		amdgpu_dm_psr_wait_disable(stream_state);
+
 	/* Enable or disable CRTC CRC generation */
 	if (dm_is_crc_source_crtc(source) || source == AMDGPU_DM_PIPE_CRC_SOURCE_NONE) {
 		if (!dc_stream_configure_crc(stream_state->ctx->dc,
-					     stream_state, NULL, enable, enable)) {
+					     stream_state, NULL, enable, enable, 0, true)) {
 			ret = -EINVAL;
 			goto unlock;
 		}
@@ -644,6 +649,17 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 
 	}
 
+	/*
+	 * Reading the CRC requires the vblank interrupt handler to be
+	 * enabled. Keep a reference until CRC capture stops.
+	 */
+	enabled = amdgpu_dm_is_valid_crc_source(cur_crc_src);
+	if (!enabled && enable) {
+		ret = drm_crtc_vblank_get(crtc);
+		if (ret)
+			goto cleanup;
+	}
+
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 	/* Reset secure_display when we change crc source from debugfs */
 	amdgpu_dm_set_crc_window_default(crtc, crtc_state->stream);
@@ -654,16 +670,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 		goto cleanup;
 	}
 
-	/*
-	 * Reading the CRC requires the vblank interrupt handler to be
-	 * enabled. Keep a reference until CRC capture stops.
-	 */
-	enabled = amdgpu_dm_is_valid_crc_source(cur_crc_src);
 	if (!enabled && enable) {
-		ret = drm_crtc_vblank_get(crtc);
-		if (ret)
-			goto cleanup;
-
 		if (dm_is_crc_source_dprx(source)) {
 			if (drm_dp_start_crc(aux, crtc)) {
 				DRM_DEBUG_DRIVER("dp start crc failed\n");
@@ -691,7 +698,8 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 	/* Initialize phy id mapping table for secure display*/
-	if (!dm->secure_display_ctx.phy_mapping_updated)
+	if (dm->secure_display_ctx.op_mode == LEGACY_MODE &&
+		!dm->secure_display_ctx.phy_mapping_updated)
 		update_phy_id_mapping(adev);
 #endif
 
@@ -774,6 +782,7 @@ void amdgpu_dm_crtc_handle_crc_window_irq(struct drm_crtc *crtc)
 	bool forward_roi_change = false;
 	bool notify_ta = false;
 	bool all_crc_ready = true;
+	struct dc_stream_state *stream_state;
 	int i;
 
 	if (crtc == NULL)
@@ -782,6 +791,7 @@ void amdgpu_dm_crtc_handle_crc_window_irq(struct drm_crtc *crtc)
 	acrtc = to_amdgpu_crtc(crtc);
 	adev = drm_to_adev(crtc->dev);
 	drm_dev = crtc->dev;
+	stream_state = to_dm_crtc_state(crtc->state)->stream;
 
 	spin_lock_irqsave(&drm_dev->event_lock, flags1);
 	cur_crc_src = acrtc->dm_irq_params.crc_src;
@@ -807,6 +817,17 @@ void amdgpu_dm_crtc_handle_crc_window_irq(struct drm_crtc *crtc)
 	}
 
 	for (i = 0; i < MAX_CRC_WINDOW_NUM; i++) {
+		struct crc_params crc_window = {
+			.windowa_x_start = acrtc->dm_irq_params.window_param[i].x_start,
+			.windowa_y_start = acrtc->dm_irq_params.window_param[i].y_start,
+			.windowa_x_end = acrtc->dm_irq_params.window_param[i].x_end,
+			.windowa_y_end = acrtc->dm_irq_params.window_param[i].y_end,
+			.windowb_x_start = acrtc->dm_irq_params.window_param[i].x_start,
+			.windowb_y_start = acrtc->dm_irq_params.window_param[i].y_start,
+			.windowb_x_end = acrtc->dm_irq_params.window_param[i].x_end,
+			.windowb_y_end = acrtc->dm_irq_params.window_param[i].y_end,
+		};
+
 		crtc_ctx->roi[i].enable = acrtc->dm_irq_params.window_param[i].enable;
 
 		if (!acrtc->dm_irq_params.window_param[i].enable) {
@@ -821,15 +842,20 @@ void amdgpu_dm_crtc_handle_crc_window_irq(struct drm_crtc *crtc)
 		}
 
 		if (acrtc->dm_irq_params.window_param[i].update_win) {
-			/* prepare work for dmub to update ROI */
-			crtc_ctx->roi[i].rect.x = acrtc->dm_irq_params.window_param[i].x_start;
-			crtc_ctx->roi[i].rect.y = acrtc->dm_irq_params.window_param[i].y_start;
-			crtc_ctx->roi[i].rect.width = acrtc->dm_irq_params.window_param[i].x_end -
-						acrtc->dm_irq_params.window_param[i].x_start;
-			crtc_ctx->roi[i].rect.height = acrtc->dm_irq_params.window_param[i].y_end -
-						acrtc->dm_irq_params.window_param[i].y_start;
+			crtc_ctx->roi[i].rect.x = crc_window.windowa_x_start;
+			crtc_ctx->roi[i].rect.y = crc_window.windowa_y_start;
+			crtc_ctx->roi[i].rect.width = crc_window.windowa_x_end -
+						crc_window.windowa_x_start;
+			crtc_ctx->roi[i].rect.height = crc_window.windowa_y_end -
+						crc_window.windowa_y_start;
 
-			forward_roi_change = true;
+			if (adev->dm.secure_display_ctx.op_mode == LEGACY_MODE)
+				/* forward task to dmub to update ROI */
+				forward_roi_change = true;
+			else if (adev->dm.secure_display_ctx.op_mode == DISPLAY_CRC_MODE)
+				/* update ROI via dm*/
+				dc_stream_configure_crc(stream_state->ctx->dc, stream_state,
+					&crc_window, true, true, i, false);
 
 			reset_crc_frame_count[i] = true;
 
@@ -843,14 +869,18 @@ void amdgpu_dm_crtc_handle_crc_window_irq(struct drm_crtc *crtc)
 			acrtc->dm_irq_params.window_param[i].skip_frame_cnt = 1;
 			crtc_ctx->crc_info.crc[i].crc_ready = false;
 		} else {
-			struct dc_stream_state *stream_state = to_dm_crtc_state(crtc->state)->stream;
-
 			if (!dc_stream_get_crc(stream_state->ctx->dc, stream_state, i,
 						&crc_r[i], &crc_g[i], &crc_b[i]))
 				DRM_ERROR("Secure Display: fail to get crc from engine %d\n", i);
 
-			/* prepare work for psp to read ROI/CRC and send to I2C */
-			notify_ta = true;
+			if (adev->dm.secure_display_ctx.op_mode == LEGACY_MODE)
+				/* forward task to psp to read ROI/CRC and output via I2C */
+				notify_ta = true;
+			else if (adev->dm.secure_display_ctx.op_mode == DISPLAY_CRC_MODE)
+				/* Avoid ROI window get changed, keep overwriting. */
+				dc_stream_configure_crc(stream_state->ctx->dc, stream_state,
+						&crc_window, true, true, i, false);
+
 			/* crc ready for psp to read out */
 			crtc_ctx->crc_info.crc[i].crc_ready = true;
 		}
@@ -914,6 +944,7 @@ void amdgpu_dm_crtc_secure_display_create_contexts(struct amdgpu_device *adev)
 	}
 
 	adev->dm.secure_display_ctx.crtc_ctx = crtc_ctx;
-	return;
+
+	adev->dm.secure_display_ctx.op_mode = DISPLAY_CRC_MODE;
 }
 #endif

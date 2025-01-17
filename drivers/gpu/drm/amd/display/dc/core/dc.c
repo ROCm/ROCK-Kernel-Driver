@@ -687,15 +687,17 @@ dc_stream_forward_multiple_crc_window(struct dc_stream_state *stream,
  * @enable: Enable CRC if true, disable otherwise.
  * @continuous: Capture CRC on every frame if true. Otherwise, only capture
  *              once.
+ * @idx: Capture CRC on which CRC engine instance
+ * @reset: Reset CRC engine before the configuration
  *
- * By default, only CRC0 is configured, and the entire frame is used to
- * calculate the CRC.
+ * By default, the entire frame is used to calculate the CRC.
  *
  * Return: %false if the stream is not found or CRC capture is not supported;
  *         %true if the stream has been configured.
  */
 bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
-			     struct crc_params *crc_window, bool enable, bool continuous)
+			     struct crc_params *crc_window, bool enable, bool continuous,
+			     uint8_t idx, bool reset)
 {
 	struct pipe_ctx *pipe;
 	struct crc_params param;
@@ -738,6 +740,9 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
 	param.selection = UNION_WINDOW_A_B;
 	param.continuous_mode = continuous;
 	param.enable = enable;
+
+	param.crc_eng_inst = idx;
+	param.reset = reset;
 
 	tg = pipe->stream_res.tg;
 
@@ -5508,6 +5513,11 @@ bool dc_set_ips_disable(struct dc *dc, unsigned int disable_ips)
 
 void dc_allow_idle_optimizations_internal(struct dc *dc, bool allow, char const *caller_name)
 {
+	int idle_fclk_khz = 0, idle_dramclk_khz = 0, i = 0;
+	enum mall_stream_type subvp_pipe_type[MAX_PIPES] = {0};
+	struct pipe_ctx *pipe = NULL;
+	struct dc_state *context = dc->current_state;
+
 	if (dc->debug.disable_idle_power_optimizations) {
 		DC_LOG_DEBUG("%s: disabled\n", __func__);
 		return;
@@ -5532,6 +5542,23 @@ void dc_allow_idle_optimizations_internal(struct dc *dc, bool allow, char const 
 		dc->idle_optimizations_allowed = allow;
 		DC_LOG_DEBUG("%s: %s\n", __func__, allow ? "enabled" : "disabled");
 	}
+
+	// log idle clocks and sub vp pipe types at idle optimization time
+	if (dc->clk_mgr != NULL && dc->clk_mgr->funcs->get_hard_min_fclk)
+		idle_fclk_khz = dc->clk_mgr->funcs->get_hard_min_fclk(dc->clk_mgr);
+
+	if (dc->clk_mgr != NULL && dc->clk_mgr->funcs->get_hard_min_memclk)
+		idle_dramclk_khz = dc->clk_mgr->funcs->get_hard_min_memclk(dc->clk_mgr);
+
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		pipe = &context->res_ctx.pipe_ctx[i];
+		subvp_pipe_type[i] = dc_state_get_pipe_subvp_type(context, pipe);
+	}
+
+	DC_LOG_DC("%s: allow_idle=%d\n HardMinUClk_Khz=%d HardMinDramclk_Khz=%d\n Pipe_0=%d Pipe_1=%d Pipe_2=%d Pipe_3=%d Pipe_4=%d Pipe_5=%d (caller=%s)\n",
+			__func__, allow, idle_fclk_khz, idle_dramclk_khz, subvp_pipe_type[0], subvp_pipe_type[1], subvp_pipe_type[2],
+			subvp_pipe_type[3], subvp_pipe_type[4], subvp_pipe_type[5], caller_name);
+
 }
 
 void dc_exit_ips_for_hw_access_internal(struct dc *dc, const char *caller_name)

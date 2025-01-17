@@ -79,6 +79,12 @@
 /* cancel_work() is available */
 #define HAVE_CANCEL_WORK 1
 
+/* struct cec_connector_info is available */
+#define HAVE_CEC_CONNECTOR_INFO 1
+
+/* cec_notifier_conn_register() is available */
+#define HAVE_CEC_NOTIFIER_CONN_REGISTER 1
+
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
@@ -307,6 +313,9 @@
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
+/* struct drm_display_info->source_physical_address is available */
+#define HAVE_DRM_DISPLAY_INFO_SOURCE_PHYSICAL_ADDRESS 1
+
 /* drm_dp_add_payload_part2 has three arguments */
 /* #undef HAVE_DRM_DP_ADD_PAYLOAD_PART2_THREE_ARGUMENTS */
 
@@ -409,9 +418,6 @@
 
 /* struct drm_dp_mst_topology_cbs->register_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR */
-
-/* struct drm_dp_mst_topology_mgr.base is available */
-#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE 1
 
 /* drm_dp_mst_topology_mgr_init() has max_lane_count and max_link_rate */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_MAX_LANE_COUNT */
@@ -631,6 +637,9 @@
 
 /* drm_print_memory_stats() is available */
 #define HAVE_DRM_PRINT_MEMORY_STATS 1
+
+/* struct drm_private_obj.lock is available */
+#define HAVE_DRM_PRIVATE_OBJ_LOCK 1
 
 /* drm_show_fdinfo() is available */
 #define HAVE_DRM_SHOW_FDINFO 1
