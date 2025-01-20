@@ -771,6 +771,9 @@ static int amdgpu_vkms_set_powergating_state(struct amdgpu_ip_block *ip_block,
 
 static const struct amd_ip_funcs amdgpu_vkms_ip_funcs = {
 	.name = "amdgpu_vkms",
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
+	.early_init = amdgpu_vkms_early_init,
+#endif
 	.sw_init = amdgpu_vkms_sw_init,
 	.sw_fini = amdgpu_vkms_sw_fini,
 	.hw_init = amdgpu_vkms_hw_init,
