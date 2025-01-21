@@ -7,6 +7,7 @@ module_src_dir := $(CURDIR)
 module_build_dir := $(shell mktemp -ut amd.XXXXXXXX)
 module_build_flags :=
 num_cpu_cores := $(shell which nproc > /dev/null && nproc || echo "1")
+CC := gcc
 Q := @
 
 ifeq ($(wildcard $(kernel_build_dir)/include/config/auto.conf),)
@@ -31,6 +32,7 @@ $(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
 endif
 
 ifneq ($(CONFIG_CC_IS_CLANG),)
+CC := clang
 module_build_flags += CC=clang
 endif
 ifneq ($(CONFIG_LD_IS_LLD),)
@@ -53,7 +55,7 @@ sanity-check: pre-build $(config-file)
 	$(if $(call KCL_MACRO_CHECK_COMMAND, HAVE_RESERVATION_WW_CLASS_BUG), $(error reservation_ww_class is missing. exit...))
 
 pre-build:
-	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(module_build_dir)
+	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(module_build_dir) $(CC)
 
 clean:
 	$(Q)make -C $(kernel_build_dir) M=$(module_src_dir) clean

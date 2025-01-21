@@ -535,7 +535,7 @@ int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
 
 	dma_fence_put(queue->last_fence);
 	queue->last_fence = dma_fence_get(fence);
-	mutex_unlock(&uq_mgr->userq_mutex);
+	mutex_unlock(&userq_mgr->userq_mutex);
 
 	for (i = 0; i < num_read_bo_handles; i++) {
 		if (!gobj_read || !gobj_read[i]->resv)
