@@ -583,11 +583,9 @@ static bool soc15_need_reset_on_resume(struct amdgpu_device *adev)
 	sol_reg = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_81);
 
 	/* Will reset for the following suspend abort cases.
-	 * 1) Only reset limit on APU side, dGPU hasn't checked yet.
-	 * 2) S3 suspend abort and TOS already launched.
+	 * 1) S3 suspend abort and TOS already launched.
 	 */
-	if (adev->flags & AMD_IS_APU && adev->in_s3 &&
-			sol_reg) {
+	if (adev->in_s3 && sol_reg) {
 		adev->suspend_complete = false;
 		return true;
 	} else {
