@@ -596,9 +596,9 @@ static const struct amdgpu_irq_src_funcs amdgpu_vkms_crtc_irq_funcs = {
 	.process = NULL,
 };
 
-static int amdgpu_vkms_early_init(void *handle)
+static int amdgpu_vkms_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->crtc_irq.num_types = adev->mode_info.num_crtc;
 	adev->crtc_irq.funcs = &amdgpu_vkms_crtc_irq_funcs;
@@ -771,6 +771,9 @@ static int amdgpu_vkms_set_powergating_state(struct amdgpu_ip_block *ip_block,
 
 static const struct amd_ip_funcs amdgpu_vkms_ip_funcs = {
 	.name = "amdgpu_vkms",
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
+	.early_init = amdgpu_vkms_early_init,
+#endif
 	.sw_init = amdgpu_vkms_sw_init,
 	.sw_fini = amdgpu_vkms_sw_fini,
 	.hw_init = amdgpu_vkms_hw_init,

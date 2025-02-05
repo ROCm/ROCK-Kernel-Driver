@@ -35,6 +35,7 @@
  * 0.2 - Support gfx9_4_3 Host Trap PC sampling
  * 0.3 - Fix gfx9_4_3 SQ hang issue
  * 1.1 - Support gfx9_4_3 Stochastic PC sampling
+ * 1.2 - Support gfx9_5_0 Host Trap PC sampling
  */
 #define KFD_IOCTL_PCS_MAJOR_VERSION	1
 #define KFD_IOCTL_PCS_MINOR_VERSION	1
@@ -55,6 +56,7 @@ struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(9, 4, 2), &sample_info_hosttrap_9_0_0 },
 	{ IP_VERSION(9, 4, 3), &sample_info_hosttrap_9_0_0 },
 	{ IP_VERSION(9, 4, 3), &sample_info_stoch_cycle_9_4_3 },
+	{ IP_VERSION(9, 5, 0), &sample_info_hosttrap_9_0_0 },
 };
 
 static int kfd_pc_sample_thread(void *param)

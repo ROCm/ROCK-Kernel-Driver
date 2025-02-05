@@ -6231,6 +6231,10 @@ get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
 	default:
 		if (dc_crtc_timing->pixel_encoding == PIXEL_ENCODING_RGB) {
 			color_space = COLOR_SPACE_SRGB;
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
+			if (connector_state->hdmi.broadcast_rgb == DRM_HDMI_BROADCAST_RGB_LIMITED)
+				color_space = COLOR_SPACE_SRGB_LIMITED;
+#endif
 		/*
 		 * 27030khz is the separation point between HDTV and SDTV
 		 * according to HDMI spec, we use YCbCr709 and YCbCr601
@@ -8587,6 +8591,12 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				dm->ddev->mode_config.scaling_mode_property,
 				DRM_MODE_SCALE_NONE);
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
+	if (connector_type == DRM_MODE_CONNECTOR_HDMIA
+		|| (connector_type == DRM_MODE_CONNECTOR_DisplayPort && !aconnector->mst_root))
+		drm_connector_attach_broadcast_rgb_property(&aconnector->base);
+#endif
+
 	drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.underscan_property,
 				UNDERSCAN_OFF);
@@ -10396,7 +10406,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		struct dc_info_packet hdr_packet;
 		bool hdr_changed;
 #endif
-		bool abm_changed, scaling_changed;
+		bool abm_changed, scaling_changed, output_color_space_changed = false;
 
 		memset(&stream_update, 0, sizeof(stream_update));
 
@@ -10415,6 +10425,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		scaling_changed = is_scaling_state_different(dm_new_con_state,
 							     dm_old_con_state);
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDMI_BROADCAST_RGB
+		if ((new_con_state->hdmi.broadcast_rgb != old_con_state->hdmi.broadcast_rgb) &&
+			(dm_old_crtc_state->stream->output_color_space !=
+				get_output_color_space(&dm_new_crtc_state->stream->timing, new_con_state)))
+			output_color_space_changed = true;
+#endif
+
 		abm_changed = dm_new_crtc_state->abm_level !=
 			      dm_old_crtc_state->abm_level;
 
@@ -10423,7 +10440,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			!drm_connector_atomic_hdr_metadata_equal(old_con_state, new_con_state);
 #endif
 
-		if (!scaling_changed && !abm_changed
+		if (!scaling_changed && !abm_changed && !output_color_space_changed
 #ifdef HDMI_DRM_INFOFRAME_SIZE
 			&& !hdr_changed
 #endif
@@ -10437,6 +10454,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 			stream_update.src = dm_new_crtc_state->stream->src;
 			stream_update.dst = dm_new_crtc_state->stream->dst;
+		}
+
+		if (output_color_space_changed) {
+			dm_new_crtc_state->stream->output_color_space
+				= get_output_color_space(&dm_new_crtc_state->stream->timing, new_con_state);
+
+			stream_update.output_color_space = &dm_new_crtc_state->stream->output_color_space;
 		}
 
 		if (abm_changed) {
@@ -11905,6 +11929,11 @@ static bool amdgpu_dm_crtc_mem_type_changed(struct drm_device *dev,
 	drm_for_each_plane_mask(plane, dev, crtc_state->plane_mask) {
 		new_plane_state = drm_atomic_get_plane_state(state, plane);
 		old_plane_state = drm_atomic_get_plane_state(state, plane);
+
+		if (IS_ERR(new_plane_state) || IS_ERR(old_plane_state)) {
+			DRM_ERROR("Failed to get plane state for plane %s\n", plane->name);
+			return false;
+		}
 
 		if (old_plane_state->fb && new_plane_state->fb &&
 		    get_mem_type(old_plane_state->fb) != get_mem_type(new_plane_state->fb))

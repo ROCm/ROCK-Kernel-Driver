@@ -874,6 +874,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	dev_info(kfd_device, "Total number of KFD nodes to be created: %d\n",
 				kfd->num_nodes);
 
+	kfd->profiler_process = NULL;
+	mutex_init(&kfd->profiler_lock);
 	/* Allocate the KFD nodes */
 	for (i = 0, xcp_idx = 0; i < kfd->num_nodes; i++) {
 		node = kzalloc(sizeof(struct kfd_node), GFP_KERNEL);
@@ -946,9 +948,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	svm_range_set_max_pages(kfd->adev);
 
-	kfd->profiler_process = NULL;
-	mutex_init(&kfd->profiler_lock);
-
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,
 		 kfd->adev->pdev->device);
@@ -962,6 +961,7 @@ node_init_error:
 node_alloc_error:
 	kfd_cleanup_nodes(kfd, i);
 	kfd_doorbell_fini(kfd);
+	mutex_destroy(&kfd->profiler_lock);
 kfd_doorbell_error:
 	kfd_gtt_sa_fini(kfd);
 kfd_gtt_sa_init_error:
