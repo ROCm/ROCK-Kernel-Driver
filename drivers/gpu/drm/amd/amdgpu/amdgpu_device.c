@@ -105,6 +105,7 @@ MODULE_FIRMWARE("amdgpu/navi12_gpu_info.bin");
 #define AMDGPU_PCIE_DATA_FALLBACK (0x3C >> 2)
 
 #define AMDGPU_VBIOS_SKIP (1U << 0)
+#define AMDGPU_VBIOS_OPTIONAL (1U << 1)
 
 static const struct drm_driver amdgpu_kms_driver;
 
@@ -1392,6 +1393,14 @@ static void amdgpu_block_invalid_wreg(struct amdgpu_device *adev,
 	BUG();
 }
 
+static uint32_t amdgpu_device_get_vbios_flags(struct amdgpu_device *adev)
+{
+	if (hweight32(adev->aid_mask) && (adev->flags & AMD_IS_APU))
+		return AMDGPU_VBIOS_SKIP;
+
+	return 0;
+}
+
 /**
  * amdgpu_device_asic_init - Wrapper for atom asic_init
  *
@@ -1401,18 +1410,28 @@ static void amdgpu_block_invalid_wreg(struct amdgpu_device *adev,
  */
 static int amdgpu_device_asic_init(struct amdgpu_device *adev)
 {
+	uint32_t flags;
+	bool optional;
 	int ret;
 
 	amdgpu_asic_pre_asic_init(adev);
+	flags = amdgpu_device_get_vbios_flags(adev);
+	optional = !!(flags & (AMDGPU_VBIOS_OPTIONAL | AMDGPU_VBIOS_SKIP));
 
 	if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 3) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 4) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 5, 0) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(11, 0, 0)) {
 		amdgpu_psp_wait_for_bootloader(adev);
+		if (optional && !adev->bios)
+			return 0;
+
 		ret = amdgpu_atomfirmware_asic_init(adev, true);
 		return ret;
 	} else {
+		if (optional && !adev->bios)
+			return 0;
+
 		return amdgpu_atom_asic_init(adev->mode_info.atom_context);
 	}
 
@@ -1703,14 +1722,6 @@ int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev)
 }
 #endif
 
-static uint32_t amdgpu_device_get_vbios_flags(struct amdgpu_device *adev)
-{
-	if (hweight32(adev->aid_mask) && (adev->flags & AMD_IS_APU))
-		return AMDGPU_VBIOS_SKIP;
-
-	return 0;
-}
-
 /*
  * GPU helpers function.
  */
@@ -1732,6 +1743,8 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev)
 
 	flags = amdgpu_device_get_vbios_flags(adev);
 	if (flags & AMDGPU_VBIOS_SKIP)
+		return false;
+	if ((flags & AMDGPU_VBIOS_OPTIONAL) && !adev->bios)
 		return false;
 
 	if (amdgpu_passthrough(adev)) {
@@ -2719,14 +2732,27 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 			skip_bios = !!(bios_flags & AMDGPU_VBIOS_SKIP);
 			/* Read BIOS */
 			if (!skip_bios) {
-				if (!amdgpu_get_bios(adev))
+				bool optional =
+					!!(bios_flags & AMDGPU_VBIOS_OPTIONAL);
+				if (!amdgpu_get_bios(adev) && !optional)
 					return -EINVAL;
 
-				r = amdgpu_atombios_init(adev);
-				if (r) {
-					dev_err(adev->dev, "amdgpu_atombios_init failed\n");
-					amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_ATOMBIOS_INIT_FAIL, 0, 0);
-					return r;
+				if (optional && !adev->bios)
+					dev_info(
+						adev->dev,
+						"VBIOS image optional, proceeding without VBIOS image");
+
+				if (adev->bios) {
+					r = amdgpu_atombios_init(adev);
+					if (r) {
+						dev_err(adev->dev,
+							"amdgpu_atombios_init failed\n");
+						amdgpu_vf_error_put(
+							adev,
+							AMDGIM_ERROR_VF_ATOMBIOS_INIT_FAIL,
+							0, 0);
+						return r;
+					}
 				}
 			}
 
@@ -4775,10 +4801,11 @@ void amdgpu_device_fini_sw(struct amdgpu_device *adev)
 	/* free i2c buses */
 	amdgpu_i2c_fini(adev);
 
-	if (amdgpu_emu_mode != 1)
-		amdgpu_atombios_fini(adev);
-
-	amdgpu_bios_release(adev);
+	if (adev->bios) {
+		if (amdgpu_emu_mode != 1)
+			amdgpu_atombios_fini(adev);
+		amdgpu_bios_release(adev);
+	}
 
 	kfree(adev->fru_info);
 	adev->fru_info = NULL;
@@ -5370,7 +5397,8 @@ int amdgpu_device_mode1_reset(struct amdgpu_device *adev)
 	u32 i;
 	int ret = 0;
 
-	amdgpu_atombios_scratch_regs_engine_hung(adev, true);
+	if (adev->bios)
+		amdgpu_atombios_scratch_regs_engine_hung(adev, true);
 
 	dev_info(adev->dev, "GPU mode1 reset\n");
 
@@ -5412,7 +5440,8 @@ int amdgpu_device_mode1_reset(struct amdgpu_device *adev)
 		goto mode1_reset_failed;
 	}
 
-	amdgpu_atombios_scratch_regs_engine_hung(adev, false);
+	if (adev->bios)
+		amdgpu_atombios_scratch_regs_engine_hung(adev, false);
 
 	return 0;
 
