@@ -557,18 +557,16 @@ bool amdgpu_ras_eeprom_check_err_threshold(struct amdgpu_device *adev)
 			return false;
 
 	if (con->eeprom_control.tbl_hdr.header == RAS_TABLE_HDR_BAD) {
-		if (con->eeprom_control.ras_num_bad_pages > con->bad_page_cnt_threshold)
+		if (amdgpu_bad_page_threshold == -1) {
 			dev_warn(adev->dev, "RAS records:%d exceed threshold:%d",
 				con->eeprom_control.ras_num_recs, con->bad_page_cnt_threshold);
-				con->eeprom_control.ras_num_bad_pages, con->bad_page_cnt_threshold);
-		if ((amdgpu_bad_page_threshold == -1) ||
-		    (amdgpu_bad_page_threshold == -2)) {
 			dev_warn(adev->dev,
-				 "Please consult AMD Service Action Guide (SAG) for appropriate service procedures.\n");
+				"But GPU can be operated due to bad_page_threshold = -1.\n");
 			return false;
 		} else {
-			dev_warn(adev->dev,
-				 "Please consider adjusting the customized threshold.\n");
+			dev_warn(adev->dev, "This GPU is in BAD status.");
+			dev_warn(adev->dev, "Please retire it or set a larger "
+				 "threshold value when reloading driver.\n");
 			return true;
 		}
 	}
@@ -752,8 +750,7 @@ amdgpu_ras_eeprom_update_header(struct amdgpu_ras_eeprom_control *control)
 			control->tbl_rai.health_percent = 0;
 		}
 
-		if ((amdgpu_bad_page_threshold != -1) &&
-		    (amdgpu_bad_page_threshold != -2))
+		if (amdgpu_bad_page_threshold != -1)
 			ras->is_rma = true;
 
 		/* ignore the -ENOTSUPP return value */
@@ -1388,9 +1385,8 @@ int amdgpu_ras_eeprom_init(struct amdgpu_ras_eeprom_control *control)
 
 		res = __verify_ras_table_checksum(control);
 		if (res)
-			dev_err(adev->dev,
-				"RAS table incorrect checksum or error:%d\n",
-				res);
+			DRM_ERROR("RAS table incorrect checksum or error:%d\n",
+				  res);
 
 		/* Warn if we are at 90% of the threshold or above
 		 */
@@ -1411,12 +1407,6 @@ int amdgpu_ras_eeprom_init(struct amdgpu_ras_eeprom_control *control)
 			DRM_ERROR("RAS Table incorrect checksum or error:%d\n",
 				  res);
 		if (ras->bad_page_cnt_threshold > control->ras_num_recs) {
-			dev_err(adev->dev,
-				"RAS Table incorrect checksum or error:%d\n",
-				res);
-			return -EINVAL;
-		}
-		if (ras->bad_page_cnt_threshold > control->ras_num_bad_pages) {
 			/* This means that, the threshold was increased since
 			 * the last time the system was booted, and now,
 			 * ras->bad_page_cnt_threshold - control->num_recs > 0,
@@ -1435,22 +1425,13 @@ int amdgpu_ras_eeprom_init(struct amdgpu_ras_eeprom_control *control)
 				control->ras_num_recs, ras->bad_page_cnt_threshold);
 			if (amdgpu_bad_page_threshold == -1) {
 				dev_warn(adev->dev, "GPU will be initialized due to bad_page_threshold = -1.");
-			dev_warn(adev->dev,
-				"RAS records:%d exceed threshold:%d\n",
-				control->ras_num_bad_pages, ras->bad_page_cnt_threshold);
-			if ((amdgpu_bad_page_threshold == -1) ||
-			    (amdgpu_bad_page_threshold == -2)) {
 				res = 0;
-				dev_warn(adev->dev,
-					 "Please consult AMD Service Action Guide (SAG) for appropriate service procedures\n");
 			} else {
 				ras->is_rma = true;
 				dev_err(adev->dev,
 					"RAS records:%d exceed threshold:%d, "
 					"GPU will not be initialized. Replace this GPU or increase the threshold",
 					control->ras_num_recs, ras->bad_page_cnt_threshold);
-				dev_warn(adev->dev,
-					 "User defined threshold is set, runtime service will be halt when threshold is reached\n");
 			}
 		}
 	} else {
