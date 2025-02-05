@@ -847,7 +847,6 @@ static int kfd_mem_export_dmabuf(struct kgd_mem *mem)
 	return 0;
 }
 
-#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 static int
 kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 		      struct amdgpu_bo **bo)
@@ -868,7 +867,6 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 
 	return 0;
 }
-#endif
 
 /**
  * @kfd_mem_attach_vram_bo: Acquires the handle of a VRAM BO that could
@@ -998,7 +996,6 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 				bo[i] = mem->bo;
 				drm_gem_object_get(&bo[i]->tbo.base);
 			}
-#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 		/* Enable acces to GTT BOs of peer devices */
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_GTT) {
 			attachment[i]->type = KFD_MEM_ATT_DMABUF;
@@ -1006,7 +1003,6 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			if (ret)
 				goto unwind;
 			pr_debug("Employ DMABUF mechanism to enable peer GPU access\n");
-#endif
 		/* Enable peer acces to VRAM BO's */
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_VRAM) {
 			ret = kfd_mem_attach_vram_bo(adev, mem,
@@ -1014,11 +1010,9 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			if (ret)
 				goto unwind;
 		} else {
-#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 			WARN_ONCE(true, "Handling invalid ATTACH request");
 			ret = -EINVAL;
 			goto unwind;
-#endif
 			attachment[i]->type = KFD_MEM_ATT_SHARED;
 			bo[i] = mem->bo;
 			drm_gem_object_get(&bo[i]->tbo.base);
@@ -2756,17 +2750,9 @@ int amdgpu_amdkfd_gpuvm_import_ipcobj(struct amdgpu_device *adev,
 	if (WARN_ON(!ipc_obj))
 		return -EINVAL;
 
-#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 	obj = amdgpu_gem_prime_import(adev_to_drm(adev), dma_buf);
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
-#else
-	obj = dma_buf->priv;
-	if (drm_to_adev(obj->dev) != adev)
-		/* Can't handle buffers from other devices */
-		return -EINVAL;
-	drm_gem_object_get(obj);
-#endif
 
 	ret = import_obj_create(adev, dma_buf, obj, va, drm_priv, mem, size,
 				mmap_offset);
