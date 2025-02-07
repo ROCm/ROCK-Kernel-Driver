@@ -581,6 +581,7 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 	return domain;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static const struct drm_format_info dcc_formats[] = {
 	{ .format = DRM_FORMAT_XRGB8888, .depth = 24, .num_planes = 2,
 	  .cpp = { 4, 0, }, .block_w = {1, 1, 1}, .block_h = {1, 1, 1}, .hsub = 1, .vsub = 1, },
@@ -673,6 +674,7 @@ amdgpu_lookup_format_info(u32 format, uint64_t modifier)
 	/* returning NULL will cause the default format structs to be used. */
 	return NULL;
 }
+#endif
 
 /*
  * Tries to extract the renderable DCC offset from the opaque metadata attached
@@ -748,6 +750,7 @@ static int convert_tiling_flags_to_modifier_gfx12(struct amdgpu_framebuffer *afb
 	return 0;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 {
 	struct amdgpu_device *adev = drm_to_adev(afb->base.dev);
@@ -941,6 +944,7 @@ static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 	afb->base.flags |= DRM_MODE_FB_MODIFIERS;
 	return 0;
 }
+#endif
 
 /* Mirrors the is_displayable check in radeonsi's gfx6_compute_surface */
 static int check_tiling_flags_gfx6(struct amdgpu_framebuffer *afb)
@@ -963,6 +967,7 @@ static int check_tiling_flags_gfx6(struct amdgpu_framebuffer *afb)
 	}
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static void get_block_dimensions(unsigned int block_log2, unsigned int cpp,
 				 unsigned int *width, unsigned int *height)
 {
@@ -1162,6 +1167,7 @@ static int amdgpu_display_verify_sizes(struct amdgpu_framebuffer *rfb)
 
 	return 0;
 }
+#endif
 
 static int amdgpu_display_get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 				      uint64_t *tiling_flags, bool *tmz_surface,
@@ -1231,6 +1237,7 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 	rfb->base.obj[0] = obj;
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	/* Verify that the modifier is supported. */
 	if (!drm_any_plane_has_format(dev, mode_cmd->pixel_format,
 				      mode_cmd->modifier[0])) {
@@ -1241,6 +1248,7 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 		ret = -EINVAL;
 		goto err;
 	}
+#endif
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
 	if (ret)
@@ -1274,6 +1282,7 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	 * This needs to happen before modifier conversion as that might change
 	 * the number of planes.
 	 */
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	for (i = 1; i < rfb->base.format->num_planes; ++i) {
 		if (mode_cmd->handles[i] != mode_cmd->handles[0]) {
 			drm_dbg_kms(dev, "Plane 0 and %d have different BOs: %u vs. %u\n",
@@ -1282,12 +1291,14 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 			return ret;
 		}
 	}
+#endif
 
 	ret = amdgpu_display_get_fb_info(rfb, &rfb->tiling_flags, &rfb->tmz_surface,
 					 &rfb->gfx12_dcc);
 	if (ret)
 		return ret;
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 #ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	if (dev->mode_config.fb_modifiers_not_supported && !adev->enable_virtual_display) {
 #else
@@ -1326,6 +1337,7 @@ static int amdgpu_display_framebuffer_init(struct drm_device *dev,
 		drm_gem_object_get(rfb->base.obj[0]);
 		rfb->base.obj[i] = rfb->base.obj[0];
 	}
+#endif
 
 	return 0;
 }
@@ -1355,13 +1367,17 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	domains = amdgpu_display_supported_domains(drm_to_adev(dev), bo->flags);
 	if (obj->import_attach && !(domains & AMDGPU_GEM_DOMAIN_GTT)) {
 		drm_dbg_kms(dev, "Cannot create framebuffer from imported dma_buf\n");
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
+#endif
 		return ERR_PTR(-EINVAL);
 	}
 
 	amdgpu_fb = kzalloc(sizeof(*amdgpu_fb), GFP_KERNEL);
 	if (amdgpu_fb == NULL) {
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
+#endif
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -1369,11 +1385,15 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 						    mode_cmd, obj);
 	if (ret) {
 		kfree(amdgpu_fb);
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
+#endif
 		return ERR_PTR(ret);
 	}
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	drm_gem_object_put(obj);
+#endif
 
 	return &amdgpu_fb->base;
 }

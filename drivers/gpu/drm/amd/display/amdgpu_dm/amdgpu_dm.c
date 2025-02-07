@@ -3576,7 +3576,9 @@ const struct amdgpu_ip_block_version dm_ip_block = {
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.get_format_info = amdgpu_dm_plane_get_format_info,
+#endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = drm_atomic_helper_commit,
 };
