@@ -146,7 +146,7 @@ static void event_interrupt_poison_consumption_v9(struct kfd_node *dev,
 {
 	enum amdgpu_ras_block block = 0;
 	uint32_t reset = 0;
-	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid, NULL);
+	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	enum ras_event_type type = RAS_EVENT_TYPE_POISON_CONSUMPTION;
 	u64 event_id;
 	int old_poison, ret;
