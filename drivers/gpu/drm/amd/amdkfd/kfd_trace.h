@@ -41,12 +41,12 @@ TRACE_EVENT(kfd_map_memory_to_gpu_start,
 	    TP_PROTO(struct kfd_process *p),
 	    TP_ARGS(p),
 	    TP_STRUCT__entry(
-			    __field(unsigned int, pasid)
+			    __field(unsigned int, pid)
 			    ),
 	    TP_fast_assign(
-			   __entry->pasid = p->pasid;
+			   __entry->pid = p->lead_thread->pid;
 			   ),
-	    TP_printk("pasid =%u", __entry->pasid)
+	    TP_printk("Process pid =%u", __entry->pid)
 );
 
 
@@ -54,17 +54,17 @@ TRACE_EVENT(kfd_map_memory_to_gpu_end,
 	    TP_PROTO(struct kfd_process *p, u32 array_size, char *pStatusMsg),
 	    TP_ARGS(p, array_size, pStatusMsg),
 	    TP_STRUCT__entry(
-				__field(unsigned int, pasid)
+				__field(unsigned int, pid)
 				__field(unsigned int, array_size)
 				__string(pStatusMsg, pStatusMsg)
 			    ),
 	    TP_fast_assign(
-			   __entry->pasid = p->pasid;
+			   __entry->pid = p->lead_thread->pid;
 				__entry->array_size = array_size;
 				__amdkcl_assign_str(pStatusMsg, pStatusMsg);
 			   ),
-	    TP_printk("pasid = %u, array_size =	%u, StatusMsg=%s",
-				__entry->pasid,
+	    TP_printk("Process pid = %u, array_size =	%u, StatusMsg=%s",
+				__entry->pid,
 				 __entry->array_size,
 				 __get_str(pStatusMsg))
 );
@@ -74,15 +74,15 @@ TRACE_EVENT(kfd_kgd2kfd_schedule_evict_and_restore_process,
 	    TP_PROTO(struct kfd_process *p, u32 delay_jiffies),
 	    TP_ARGS(p, delay_jiffies),
 	    TP_STRUCT__entry(
-				__field(unsigned int, pasid)
+				__field(unsigned int, pid)
 				__field(unsigned int, delay_jiffies)
 			    ),
 	    TP_fast_assign(
-			   __entry->pasid = p->pasid;
+			   __entry->pid = p->lead_thread->pid;
 			   __entry->delay_jiffies = delay_jiffies;
 			),
-	    TP_printk("pasid = %u, delay_jiffies = %u",
-		      __entry->pasid,
+	    TP_printk("Process pid = %u, delay_jiffies = %u",
+		      __entry->pid,
 		      __entry->delay_jiffies)
 );
 
@@ -91,12 +91,12 @@ TRACE_EVENT(kfd_evict_process_worker_start,
 	    TP_PROTO(struct kfd_process *p),
 	    TP_ARGS(p),
 	    TP_STRUCT__entry(
-				__field(unsigned int, pasid)
+				__field(unsigned int, pid)
 			    ),
 	    TP_fast_assign(
-			   __entry->pasid = p->pasid;
+			   __entry->pid = p->lead_thread->pid;
 			   ),
-	    TP_printk("pasid=%u", __entry->pasid)
+	    TP_printk("Process pid=%u", __entry->pid)
 );
 
 
@@ -104,15 +104,15 @@ TRACE_EVENT(kfd_evict_process_worker_end,
 	    TP_PROTO(struct kfd_process *p, char *pStatusMsg),
 	    TP_ARGS(p, pStatusMsg),
 	    TP_STRUCT__entry(
-			    __field(unsigned int, pasid)
+			    __field(unsigned int, pid)
 			    __string(pStatusMsg, pStatusMsg)
 			    ),
 	    TP_fast_assign(
-			    __entry->pasid = p->pasid;
+			    __entry->pid = p->lead_thread->pid;
 			    __amdkcl_assign_str(pStatusMsg, pStatusMsg);
 			   ),
-	    TP_printk("pasid=%u, StatusMsg=%s",
-			    __entry->pasid, __get_str(pStatusMsg))
+	    TP_printk("Process pid=%u, StatusMsg=%s",
+			    __entry->pid, __get_str(pStatusMsg))
 );
 
 
@@ -120,27 +120,27 @@ TRACE_EVENT(kfd_restore_process_worker_start,
 	    TP_PROTO(struct kfd_process *p),
 	    TP_ARGS(p),
 	    TP_STRUCT__entry(
-				__field(unsigned int, pasid)
+				__field(unsigned int, pid)
 			    ),
 	    TP_fast_assign(
-			   __entry->pasid = p->pasid;
+			   __entry->pid = p->lead_thread->pid;
 			   ),
-	    TP_printk("pasid=%u", __entry->pasid)
+	    TP_printk("Process pid=%u", __entry->pid)
 );
 
 TRACE_EVENT(kfd_restore_process_worker_end,
 	    TP_PROTO(struct kfd_process *p, char *pStatusMsg),
 	    TP_ARGS(p, pStatusMsg),
 	    TP_STRUCT__entry(
-				__field(unsigned int, pasid)
+				__field(unsigned int, pid)
 				__string(pStatusMsg, pStatusMsg)
 			    ),
 	    TP_fast_assign(
-				 entry->pasid = p->pasid;
+				 entry->pid = p->lead_thread->pid;
 				__amdkcl_assign_str(pStatusMsg, pStatusMsg);
 			   ),
-	    TP_printk("pasid=%u, StatusMsg=%s",
-			    __entry->pasid, __get_str(pStatusMsg))
+	    TP_printk("Process pid=%u, StatusMsg=%s",
+			    __entry->pid, __get_str(pStatusMsg))
 );
 
 #endif

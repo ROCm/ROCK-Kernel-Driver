@@ -46,8 +46,6 @@
 
 #include "dmub/inc/dmub_cmd.h"
 
-#include "spl/dc_spl_types.h"
-
 struct abm_save_restore;
 
 /* forward declaration */
@@ -55,7 +53,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.317"
+#define DC_VER "3.2.319"
 
 #define MAX_SURFACES 4
 #define MAX_PLANES 6
@@ -473,6 +471,7 @@ struct dc_config {
 	bool consolidated_dpia_dp_lt;
 	bool set_pipe_unlock_order;
 	bool enable_dpia_pre_training;
+	bool unify_link_enc_assignment;
 };
 
 enum visual_confirm {
@@ -778,6 +777,7 @@ union dpia_debug_options {
 		uint32_t disable_usb4_pm_support:1; /* bit 5 */
 		uint32_t enable_consolidated_dpia_dp_lt:1; /* bit 6 */
 		uint32_t enable_dpia_pre_training:1; /* bit 7 */
+		uint32_t unify_link_enc_assignment:1; /* bit 8 */
 		uint32_t reserved:24;
 	} bits;
 	uint32_t raw;
@@ -1584,8 +1584,6 @@ bool dc_validate_boot_timing(const struct dc *dc,
 				struct dc_crtc_timing *crtc_timing);
 
 enum dc_status dc_validate_plane(struct dc *dc, const struct dc_plane_state *plane_state);
-
-void get_clock_requirements_for_state(struct dc_state *state, struct AsicStateEx *info);
 
 enum dc_status dc_validate_with_context(struct dc *dc,
 					const struct dc_validation_set set[],

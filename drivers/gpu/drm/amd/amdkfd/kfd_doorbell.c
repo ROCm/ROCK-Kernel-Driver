@@ -141,7 +141,7 @@ static int kfd_doorbell_vm_fault(struct vm_area_struct *vma, struct vm_fault *vm
 	if (!pdd)
 		return VM_FAULT_SIGBUS;
 
-	pr_debug("Process %d doorbell vm page fault\n", pdd->process->pasid);
+	pr_debug("Process pid %d doorbell vm page fault\n", pdd->process->lead_thread->pid);
 
 	kfd_process_remap_doorbells_locked(pdd->process);
 
@@ -171,8 +171,8 @@ static void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
 		return;
 	}
 
-	pr_debug("Process %d unmapping doorbell 0x%lx\n",
-			process->pasid, vma->vm_start);
+	pr_debug("Process pid %d unmapping doorbell 0x%lx\n",
+			process->lead_thread->pid, vma->vm_start);
 
 	size = kfd_doorbell_process_slice(pdd->dev->kfd);
 	zap_vma_ptes(vma, vma->vm_start, size);
@@ -203,13 +203,13 @@ int kfd_doorbell_remap(struct kfd_process_device *pdd)
 	vma = pdd->qpd.doorbell_vma;
 	size = kfd_doorbell_process_slice(pdd->dev->kfd);
 
-	pr_debug("Process %d remap doorbell 0x%lx\n", process->pasid,
-		vma->vm_start);
+	pr_debug("Process pid %d remap doorbell 0x%lx\n",
+			process->lead_thread->pid, vma->vm_start);
 
 	ret = vm_iomap_memory(vma, address, size);
 	if (ret)
-		pr_err("Process %d failed to remap doorbell 0x%lx\n",
-			process->pasid, vma->vm_start);
+		pr_err("Process pid %d failed to remap doorbell 0x%lx\n",
+				process->lead_thread->pid, vma->vm_start);
 
 out_unlock:
 	pdd->qpd.doorbell_mapped = 1;
@@ -245,12 +245,12 @@ int kfd_doorbell_mmap(struct kfd_node *dev, struct kfd_process *process,
 
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	pr_debug("Process %d mapping doorbell page\n"
+	pr_debug("Process pid %d mapping doorbell page\n"
 		 "     target user address == 0x%08llX\n"
 		 "     physical address    == 0x%08llX\n"
 		 "     vm_flags            == 0x%04lX\n"
 		 "     size                == 0x%04lX\n",
-		 process->pasid, (unsigned long long) vma->vm_start,
+		 process->lead_thread->pid, (unsigned long long) vma->vm_start,
 		 address, vma->vm_flags, kfd_doorbell_process_slice(dev->kfd));
 
 	pdd = kfd_get_process_device_data(dev, process);
@@ -275,8 +275,8 @@ int kfd_doorbell_mmap(struct kfd_node *dev, struct kfd_process *process,
 		 * doorbell is accessed the first time
 		 */
 		if (pdd->qpd.doorbell_mapped == -1) {
-			pr_debug("Process %d evicted, unmapping doorbell\n",
-				process->pasid);
+			pr_debug("Process pid %d evicted, unmapping doorbell\n",
+					process->lead_thread->pid);
 			kfd_doorbell_unmap_locked(pdd);
 		} else {
 			pdd->qpd.doorbell_mapped = 1;
