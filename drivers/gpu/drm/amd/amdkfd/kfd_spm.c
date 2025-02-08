@@ -682,7 +682,7 @@ int kfd_rlc_spm(struct kfd_process *p,  void *data)
 
 	switch (args->op) {
 	case KFD_IOCTL_SPM_OP_ACQUIRE:
-		dev->spm_pasid = pdd->pasid;
+		dev->spm_pasid = p->pasid;
 		return  kfd_acquire_spm(pdd, dev->adev);
 
 	case KFD_IOCTL_SPM_OP_RELEASE:
@@ -711,12 +711,16 @@ void kgd2kfd_spm_interrupt(struct kfd_dev *kfd, int xcc_id)
 		fls(amdgpu_xcp_get_partition(kfd->adev->xcp_mgr, AMDGPU_XCP_GFX, xcc_id)) - 1 : 0;
 	dev = kfd->nodes[xcp_id];
 	pasid = dev->spm_pasid;
-	p = kfd_lookup_process_by_pasid(pasid, &pdd);
+	p = kfd_lookup_process_by_pasid(pasid);
 
-	if (!pdd) {
+	if (!p) {
 		dev_dbg(dev->adev->dev, "kfd_spm_interrupt p = %p\n", p);
 		return; /* Presumably process exited. */
 	}
+
+	pdd = kfd_get_process_device_data(dev, p);
+	if (!pdd)
+		return;
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 	if (pdd->spm_cntr && pdd->spm_cntr->spm[xcc_id].is_spm_started)
