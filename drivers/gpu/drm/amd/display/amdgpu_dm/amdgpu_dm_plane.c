@@ -94,10 +94,12 @@ enum dm_micro_swizzle {
 	MICRO_SWIZZLE_R = 3
 };
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 const struct drm_format_info *amdgpu_dm_plane_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
 {
 	return amdgpu_lookup_format_info(cmd->pixel_format, cmd->modifier[0]);
 }
+#endif
 
 void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 			       bool *per_pixel_alpha, bool *pre_multiplied_alpha,
@@ -306,6 +308,7 @@ static int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
 	return 0;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 								     const struct amdgpu_framebuffer *afb,
 								     const enum surface_pixel_format format,
@@ -356,6 +359,7 @@ static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdg
 
 	return ret;
 }
+#endif
 
 static int amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 								      const struct amdgpu_framebuffer *afb,
@@ -909,12 +913,14 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		if (ret)
 			return ret;
 	} else if (adev->family >= AMDGPU_FAMILY_AI) {
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		ret = amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
 										rotation, plane_size,
 										tiling_info, dcc,
 										address);
 		if (ret)
 			return ret;
+#endif
 	} else {
 		amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(tiling_info, tiling_flags);
 	}
@@ -1550,6 +1556,7 @@ static struct drm_plane_state *amdgpu_dm_plane_drm_plane_duplicate_state(struct 
 	return &dm_plane_state->base;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 						 uint32_t format,
 						 uint64_t modifier)
@@ -1611,6 +1618,7 @@ static bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 
 	return true;
 }
+#endif
 
 static void amdgpu_dm_plane_drm_plane_destroy_state(struct drm_plane *plane,
 						    struct drm_plane_state *state)
@@ -1824,7 +1832,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.reset = amdgpu_dm_plane_drm_plane_reset,
 	.atomic_duplicate_state = amdgpu_dm_plane_drm_plane_duplicate_state,
 	.atomic_destroy_state = amdgpu_dm_plane_drm_plane_destroy_state,
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.format_mod_supported = amdgpu_dm_plane_format_mod_supported,
+#endif
 #ifdef AMD_PRIVATE_COLOR
 	.atomic_set_property = dm_atomic_plane_set_property,
 	.atomic_get_property = dm_atomic_plane_get_property,
@@ -1846,9 +1856,11 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	num_formats = amdgpu_dm_plane_get_plane_formats(plane, plane_cap, formats,
 							ARRAY_SIZE(formats));
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	res = amdgpu_dm_plane_get_plane_modifiers(dm->adev, plane->type, &modifiers);
 	if (res)
 		return res;
+#endif
 
 #ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	if (modifiers == NULL)
