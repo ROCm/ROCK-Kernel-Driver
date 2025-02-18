@@ -149,4 +149,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #drm: Implement DRM aperture helpers under video/
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/aperture.h])
+
+	dnl #v5.9-7812-gb296a6d53339
+	dnl #kernel.h: split out min()/max() et al. helpers
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/minmax.h])
 ])
