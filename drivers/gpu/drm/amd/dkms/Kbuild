@@ -191,10 +191,13 @@ endif
 # if the compiler is using core2 optimizations and only build DCN2/3
 # if core2 isn't in the compiler flags
 ifndef CONFIG_ARM64
-ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
-export CONFIG_DRM_AMD_DC_FP=y
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_FP
-endif
+    ifeq ($(CC), clang)
+        export CONFIG_DRM_AMD_DC_FP=y
+        subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_FP
+    else ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
+        export CONFIG_DRM_AMD_DC_FP=y
+        subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_FP
+    endif
 endif
 
 # v5.17-rc4-3-ge8c07082a810 (Kbuild: move to -std=gnu11)
