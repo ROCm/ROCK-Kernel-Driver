@@ -24,6 +24,10 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#ifndef HAVE_DRM_DRM_MANAGED_H
+#include <linux/mm.h>
+#include <linux/slab.h>
+#endif
 
 #include <drm/drm_drv.h>
 
@@ -95,6 +99,10 @@ void amdgpu_xcp_drv_release(void)
 
 		devres_release_group(&pdev->dev, NULL);
 		platform_device_unregister(pdev);
+#ifndef HAVE_DRM_DRM_MANAGED_H
+		drm_dev_fini(&(xcp_dev[pdev_num]->drm));
+		kfree(xcp_dev[pdev_num]);
+#endif
 		xcp_dev[pdev_num] = NULL;
 	}
 	pdev_num = 0;
