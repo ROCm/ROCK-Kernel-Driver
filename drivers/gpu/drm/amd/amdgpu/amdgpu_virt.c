@@ -1321,6 +1321,9 @@ static int amdgpu_virt_req_ras_err_count_internal(struct amdgpu_device *adev, bo
 {
 	struct amdgpu_virt *virt = &adev->virt;
 
+	if (!virt->ops || !virt->ops->req_ras_err_count)
+		return -EOPNOTSUPP;
+
 	/* Host allows 15 ras telemetry requests per 60 seconds. Afterwhich, the Host
 	 * will ignore incoming guest messages. Ratelimit the guest messages to
 	 * prevent guest self DOS.
@@ -1376,14 +1379,16 @@ amdgpu_virt_write_cpers_to_ring(struct amdgpu_device *adev,
 	used_size = host_telemetry->header.used_size;
 
 	if (used_size > (AMD_SRIOV_RAS_TELEMETRY_SIZE_KB << 10))
-		return 0;
+		return -EINVAL;
 
 	cper_dump = kmemdup(&host_telemetry->body.cper_dump, used_size, GFP_KERNEL);
 	if (!cper_dump)
 		return -ENOMEM;
 
-	if (checksum != amd_sriov_msg_checksum(cper_dump, used_size, 0, 0))
+	if (checksum != amd_sriov_msg_checksum(cper_dump, used_size, 0, 0)) {
+		ret = -EINVAL;
 		goto out;
+	}
 
 	*more = cper_dump->more;
 
@@ -1423,7 +1428,7 @@ static int amdgpu_virt_req_ras_cper_dump_internal(struct amdgpu_device *adev)
 	int ret = 0;
 	uint32_t more = 0;
 
-	if (!amdgpu_sriov_ras_cper_en(adev))
+	if (!virt->ops || !virt->ops->req_ras_cper_dump)
 		return -EOPNOTSUPP;
 
 	do {
@@ -1432,7 +1437,7 @@ static int amdgpu_virt_req_ras_cper_dump_internal(struct amdgpu_device *adev)
 				adev, virt->fw_reserve.ras_telemetry, &more);
 		else
 			ret = 0;
-	} while (more);
+	} while (more && !ret);
 
 	return ret;
 }
@@ -1441,6 +1446,9 @@ int amdgpu_virt_req_ras_cper_dump(struct amdgpu_device *adev, bool force_update)
 {
 	struct amdgpu_virt *virt = &adev->virt;
 	int ret = 0;
+
+	if (!amdgpu_sriov_ras_cper_en(adev))
+		return -EOPNOTSUPP;
 
 	if ((__ratelimit(&virt->ras.ras_cper_dump_rs) || force_update) &&
 	    down_read_trylock(&adev->reset_domain->sem)) {
