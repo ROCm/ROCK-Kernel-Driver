@@ -2969,13 +2969,19 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages, NULL);
 		if (ret) {
 			mem->user_pages[0] = NULL;
-			pr_info("%s: Failed to get user pages: %d\n",
+			pr_debug("%s: Failed to get user pages: %d\n",
 				__func__, ret);
 			/* Pretend it succeeded. It will fail later
 			 * with a VM fault if the GPU tries to access
 			 * it. Better than hanging indefinitely with
 			 * stalled user mode queues.
+			 *
+			 * Return other error -EBUSY or -ENOMEM to retry restore
 			 */
+			if (ret != -EFAULT)
+				return ret;
+
+			ret = 0;
 		}
 #endif
 		mutex_lock(&process_info->notifier_lock);
