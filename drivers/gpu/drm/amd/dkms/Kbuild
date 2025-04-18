@@ -172,6 +172,10 @@ subdir-ccflags-y += -DCONFIG_HSA_AMD_SVM
 endif
 endif
 
+ifeq ($(call _is_kcl_macro_defined,HAVE_KFD_PEERDIRECT_SUPPORT),y)
+  KBUILD_EXTRA_SYMBOLS += "/usr/src/ofa_kernel/x86_64/$(KERNELRELEASE)/Module.symvers"
+endif
+
 export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 
